@@ -1,13 +1,184 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useEffect, useState } from "react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import { toast } from "sonner";
-import { BookOpen, Sparkles, Globe, Heart, Star, Share2, Trash2, Plus, ArrowRight, Wand2, Library, Maximize, Minimize, X, Menu } from "lucide-react";
+import { BookOpen, Sparkles, Share2, Trash2, Wand2, Library, Maximize, X, Menu } from "lucide-react";
 import Link from "next/link";
 import { supabase, Book } from "@/lib/supabase";
+
+// Content type interfaces
+interface EducationalContent {
+  comprehensionQuiz?: {
+    questions?: Array<{
+      question: string;
+      options: string[];
+      correct: string;
+      explanation: string;
+    }>;
+  };
+  vocabularyBuilder?: {
+    vocabulary?: Array<{
+      word: string;
+      definition: string;
+      example: string;
+      visual: string;
+    }>;
+  };
+  culturalFacts?: {
+    culturalFacts?: Array<{
+      fact: string;
+      category: string;
+      funElement: string;
+    }>;
+  };
+  activities?: {
+    activities?: Array<{
+      title: string;
+      description: string;
+      materials: string;
+      learningObjective: string;
+    }>;
+  };
+}
+
+interface AccessibilityContent {
+  altText?: {
+    altText: string;
+    simpleAltText: string;
+    emotionalContext: string;
+    keyElements: string[];
+  };
+  simplifiedText?: {
+    earlyReader: string;
+    middleReader: string;
+    advancedReader: string;
+    originalText: string;
+    readingLevels: {
+      early: string;
+      middle: string;
+      advanced: string;
+    };
+  };
+  dyslexiaFriendly?: {
+    formatting: {
+      font: string;
+      size: string;
+      lineHeight: string;
+      letterSpacing: string;
+    };
+    colorCoding: Record<string, string>;
+    chunking: string[];
+    visualAids: string[];
+    memoryTechniques: string[];
+  };
+}
+
+interface PresentationContent {
+  animations?: {
+    animations?: Array<{
+      element: string;
+      type: string;
+      description: string;
+      duration: string;
+      trigger: string;
+    }>;
+  };
+  interactiveElements?: {
+    clickableElements?: Array<{
+      element: string;
+      action: string;
+      feedback: string;
+      sound: string;
+    }>;
+  };
+  soundEffects?: {
+    ambientSounds?: Array<{
+      sound: string;
+      description: string;
+      volume: string;
+      loop: boolean;
+    }>;
+  };
+}
+
+interface ReadabilityContent {
+  textSimplification?: {
+    simplifiedVersions?: {
+      verySimple: string;
+      simple: string;
+      enhanced: string;
+      original: string;
+    };
+    readabilityScores?: {
+      gradeLevel: string;
+      difficulty: string;
+      fleschKincaid: string;
+    };
+  };
+  sentenceAnalysis?: {
+    sentenceAnalysis?: {
+      totalSentences: number;
+      averageLength: number;
+      longestSentence: number;
+      shortestSentence: number;
+    };
+    wordAnalysis?: {
+      totalWords: number;
+      complexWords: string[];
+    };
+    flowAnalysis?: {
+      smoothTransitions: string;
+      awkwardPhrases: string;
+    };
+  };
+  vocabularyHighlighting?: {
+    challengingWords?: Array<{
+      word: string;
+      definition: string;
+      contextClue: string;
+      visualCue: string;
+      difficulty: string;
+      syllables: number;
+    }>;
+  };
+  readingPaceGuide?: {
+    paceGuide?: {
+      recommendedSpeed: string;
+      wordsPerMinute: number;
+      totalReadingTime: string;
+      pausePoints?: Array<{
+        location: string;
+        reason: string;
+        duration: string;
+      }>;
+    };
+  };
+  comprehensionAids?: {
+    questionPrompts?: Array<{
+      type: string;
+      questions: string[];
+    }>;
+    summaryGuide?: {
+      mainCharacter: string;
+      setting: string;
+      problem: string;
+      solution: string;
+      lesson: string;
+    };
+  };
+  visualReadingSupport?: {
+    textFormatting?: {
+      fontFamily: string;
+      fontSize: string;
+      lineHeight: string;
+      letterSpacing: string;
+    };
+    colorCoding?: Record<string, string>;
+  };
+}
 
 const STORAGE_KEY = "nano_travel_books_v1";
 
@@ -28,14 +199,14 @@ export default function Home() {
   const [illustrationStyle, setIllustrationStyle] = useState("realistic");
   const [consistencyMode, setConsistencyMode] = useState(false);
   const [showEducationalFeatures, setShowEducationalFeatures] = useState(false);
-  const [educationalContent, setEducationalContent] = useState<any>(null);
+  const [educationalContent, setEducationalContent] = useState<EducationalContent | null>(null);
   const [showAccessibilityFeatures, setShowAccessibilityFeatures] = useState(false);
-  const [accessibilityContent, setAccessibilityContent] = useState<any>(null);
+  const [accessibilityContent, setAccessibilityContent] = useState<AccessibilityContent | null>(null);
   const [showPresentationFeatures, setShowPresentationFeatures] = useState(false);
-  const [presentationContent, setPresentationContent] = useState<any>(null);
+  const [presentationContent, setPresentationContent] = useState<PresentationContent | null>(null);
   const [isBatchIllustrating, setIsBatchIllustrating] = useState(false);
   const [showReadabilityFeatures, setShowReadabilityFeatures] = useState(false);
-  const [readabilityContent, setReadabilityContent] = useState<any>(null);
+  const [readabilityContent, setReadabilityContent] = useState<ReadabilityContent | null>(null);
   const [isIllustrating, setIsIllustrating] = useState(false);
   const [isLoadingEducational, setIsLoadingEducational] = useState(false);
   const [isLoadingAccessibility, setIsLoadingAccessibility] = useState(false);
@@ -120,7 +291,7 @@ export default function Home() {
     }
   }, [books]);
 
-  async function deleteBook(bookId: string) {
+  async function _deleteBook(bookId: string) {
     try {
       // Try to delete from Supabase first
       const { error } = await supabase
@@ -199,8 +370,8 @@ export default function Home() {
       }));
       setActive({ ...active, pages: updatedPages });
       toast.success("Advanced illustration added");
-    } catch (e: any) {
-      toast.error("Illustration failed", { description: e?.message });
+    } catch (e: unknown) {
+      toast.error("Illustration failed", { description: e instanceof Error ? e.message : "Unknown error" });
     } finally {
       setIsIllustrating(false);
     }
@@ -229,8 +400,8 @@ export default function Home() {
       setEducationalContent(data.educationalContent);
       setShowEducationalFeatures(true);
       toast.success("Educational features loaded");
-    } catch (e: any) {
-      toast.error("Failed to load educational features", { description: e?.message });
+    } catch (e: unknown) {
+      toast.error("Failed to load educational features", { description: e instanceof Error ? e.message : "Unknown error" });
     } finally {
       setIsLoadingEducational(false);
     }
@@ -268,8 +439,8 @@ export default function Home() {
       // Copy share content to clipboard
       await navigator.clipboard.writeText(shareContent);
       toast.success("Share content and link copied to clipboard!");
-    } catch (e: any) {
-      toast.error("Failed to generate share content", { description: e?.message });
+    } catch (e: unknown) {
+      toast.error("Failed to generate share content", { description: e instanceof Error ? e.message : "Unknown error" });
     } finally {
       setIsGeneratingShare(false);
     }
@@ -298,8 +469,8 @@ export default function Home() {
       setAccessibilityContent(data.accessibilityContent);
       setShowAccessibilityFeatures(true);
       toast.success("Accessibility features loaded");
-    } catch (e: any) {
-      toast.error("Failed to load accessibility features", { description: e?.message });
+    } catch (e: unknown) {
+      toast.error("Failed to load accessibility features", { description: e instanceof Error ? e.message : "Unknown error" });
     } finally {
       setIsLoadingAccessibility(false);
     }
@@ -328,8 +499,8 @@ export default function Home() {
       setPresentationContent(data.presentationContent);
       setShowPresentationFeatures(true);
       toast.success("Presentation features loaded");
-    } catch (e: any) {
-      toast.error("Failed to load presentation features", { description: e?.message });
+    } catch (e: unknown) {
+      toast.error("Failed to load presentation features", { description: e instanceof Error ? e.message : "Unknown error" });
     } finally {
       setIsLoadingPresentation(false);
     }
@@ -362,7 +533,7 @@ export default function Home() {
       
       // Update book with new illustrations
       const updatedPages = active.pages.map((page, index) => {
-        const result = data.results.find((r: any) => r.pageIndex === index);
+        const result = data.results.find((r: { pageIndex: number; imageUrl: string }) => r.pageIndex === index);
         return result ? { ...page, imageUrl: result.imageUrl } : page;
       });
       
@@ -381,8 +552,8 @@ export default function Home() {
       setActive({ ...active, pages: updatedPages });
       
       toast.success(`Batch illustration completed! ${data.summary.successful}/${data.summary.totalPages} pages illustrated`);
-    } catch (e: any) {
-      toast.error("Batch illustration failed", { description: e?.message });
+    } catch (e: unknown) {
+      toast.error("Batch illustration failed", { description: e instanceof Error ? e.message : "Unknown error" });
     } finally {
       setIsBatchIllustrating(false);
     }
@@ -410,8 +581,8 @@ export default function Home() {
       setReadabilityContent(data.readabilityContent);
       setShowReadabilityFeatures(true);
       toast.success("Readability features loaded");
-    } catch (e: any) {
-      toast.error("Failed to load readability features", { description: e?.message });
+    } catch (e: unknown) {
+      toast.error("Failed to load readability features", { description: e instanceof Error ? e.message : "Unknown error" });
     } finally {
       setIsLoadingReadability(false);
     }
@@ -567,6 +738,13 @@ export default function Home() {
                             src={page.imageUrl}
                             alt={`Page ${index + 1}`}
                             className="w-full h-full object-cover"
+                            onError={(e) => {
+                              console.error('Image failed to load:', page.imageUrl);
+                              e.currentTarget.style.display = 'none';
+                            }}
+                            onLoad={() => {
+                              console.log('Image loaded successfully:', page.imageUrl);
+                            }}
                           />
                         </div>
                       )}
@@ -853,6 +1031,13 @@ export default function Home() {
                                           src={page.imageUrl} 
                                           alt="Illustration" 
                                           className="w-full h-full object-contain bg-slate-100 dark:bg-slate-700"
+                                          onError={(e) => {
+                                            console.error('Image failed to load:', page.imageUrl);
+                                            e.currentTarget.style.display = 'none';
+                                          }}
+                                          onLoad={() => {
+                                            console.log('Image loaded successfully:', page.imageUrl);
+                                          }}
                                         />
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
                                       </div>
@@ -1091,7 +1276,7 @@ export default function Home() {
                   <div className="bg-blue-50 rounded-lg p-4">
                     <h3 className="text-lg font-semibold text-blue-900 mb-3">📝 Comprehension Quiz</h3>
                     <div className="space-y-3">
-                      {educationalContent.comprehensionQuiz.questions?.map((q: any, idx: number) => (
+                      {educationalContent.comprehensionQuiz.questions?.map((q, idx: number) => (
                         <div key={idx} className="bg-white rounded p-3 border border-gray-200">
                           <p className="font-medium text-gray-900 mb-2">{q.question}</p>
                           <div className="space-y-1">
@@ -1114,11 +1299,11 @@ export default function Home() {
                   <div className="bg-green-50 rounded-lg p-4">
                     <h3 className="text-lg font-semibold text-green-900 mb-3">📚 Vocabulary Builder</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {educationalContent.vocabularyBuilder.vocabulary?.map((word: any, idx: number) => (
+                      {educationalContent.vocabularyBuilder.vocabulary?.map((word, idx: number) => (
                         <div key={idx} className="bg-white rounded p-3 border border-gray-200">
                           <h4 className="font-semibold text-green-800">{word.word}</h4>
                           <p className="text-sm text-gray-900 font-medium mb-1">{word.definition}</p>
-                          <p className="text-xs text-gray-800 italic">"{word.example}"</p>
+                          <p className="text-xs text-gray-800 italic">&quot;{word.example}&quot;</p>
                           <p className="text-xs text-gray-700 mt-1">{word.visual}</p>
                         </div>
                       ))}
@@ -1131,7 +1316,7 @@ export default function Home() {
                   <div className="bg-purple-50 rounded-lg p-4">
                     <h3 className="text-lg font-semibold text-purple-900 mb-3">🌍 Cultural Facts</h3>
                     <div className="space-y-2">
-                      {educationalContent.culturalFacts.culturalFacts?.map((fact: any, idx: number) => (
+                      {educationalContent.culturalFacts.culturalFacts?.map((fact, idx: number) => (
                         <div key={idx} className="bg-white rounded p-3 border border-gray-200">
                           <p className="text-gray-900 mb-1 font-medium">{fact.fact}</p>
                           <div className="flex items-center gap-2 text-xs text-gray-800">
@@ -1149,7 +1334,7 @@ export default function Home() {
                   <div className="bg-orange-50 rounded-lg p-4">
                     <h3 className="text-lg font-semibold text-orange-900 mb-3">🎨 Activity Suggestions</h3>
                     <div className="space-y-3">
-                      {educationalContent.activities.activities?.map((activity: any, idx: number) => (
+                      {educationalContent.activities.activities?.map((activity, idx: number) => (
                         <div key={idx} className="bg-white rounded p-3">
                           <h4 className="font-semibold text-orange-800 mb-1">{activity.title}</h4>
                           <p className="text-sm text-gray-700 mb-2">{activity.description}</p>
@@ -1285,7 +1470,7 @@ export default function Home() {
                   <div className="bg-orange-50 rounded-lg p-4">
                     <h3 className="text-lg font-semibold text-orange-900 mb-3">🎬 Animation Effects</h3>
                     <div className="space-y-3">
-                      {presentationContent.animations.animations?.map((animation: any, idx: number) => (
+                      {presentationContent.animations.animations?.map((animation, idx: number) => (
                         <div key={idx} className="bg-white rounded p-3">
                           <h4 className="font-medium text-orange-800 mb-1">{animation.element} - {animation.type}</h4>
                           <p className="text-sm text-gray-700 mb-2">{animation.description}</p>
@@ -1304,7 +1489,7 @@ export default function Home() {
                   <div className="bg-pink-50 rounded-lg p-4">
                     <h3 className="text-lg font-semibold text-pink-900 mb-3">🎮 Interactive Elements</h3>
                     <div className="space-y-3">
-                      {presentationContent.interactiveElements.clickableElements?.map((element: any, idx: number) => (
+                      {presentationContent.interactiveElements.clickableElements?.map((element, idx: number) => (
                         <div key={idx} className="bg-white rounded p-3">
                           <h4 className="font-medium text-pink-800 mb-1">Clickable: {element.element}</h4>
                           <p className="text-sm text-gray-700 mb-2">Action: {element.action} - {element.feedback}</p>
@@ -1320,7 +1505,7 @@ export default function Home() {
                   <div className="bg-indigo-50 rounded-lg p-4">
                     <h3 className="text-lg font-semibold text-indigo-900 mb-3">🔊 Sound Effects</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {presentationContent.soundEffects.ambientSounds?.map((sound: any, idx: number) => (
+                      {presentationContent.soundEffects.ambientSounds?.map((sound, idx: number) => (
                         <div key={idx} className="bg-white rounded p-3">
                           <h4 className="font-medium text-indigo-800 mb-1">{sound.sound}</h4>
                           <p className="text-sm text-gray-700 mb-2">{sound.description}</p>
@@ -1426,7 +1611,7 @@ export default function Home() {
                   <div className="bg-purple-50 rounded-lg p-4">
                     <h3 className="text-lg font-semibold text-purple-900 mb-3">🔤 Vocabulary Support</h3>
                     <div className="space-y-3">
-                      {readabilityContent.vocabularyHighlighting.challengingWords?.map((word: any, idx: number) => (
+                      {readabilityContent.vocabularyHighlighting.challengingWords?.map((word, idx: number) => (
                         <div key={idx} className="bg-white rounded p-3 border border-gray-200">
                           <div className="flex items-center justify-between mb-2">
                             <h4 className="font-semibold text-purple-800">{word.word}</h4>
@@ -1435,7 +1620,7 @@ export default function Home() {
                             </span>
                           </div>
                           <p className="text-sm text-gray-900 font-medium mb-1">{word.definition}</p>
-                          <p className="text-xs text-gray-800 italic">"{word.contextClue}"</p>
+                          <p className="text-xs text-gray-800 italic">&quot;{word.contextClue}&quot;</p>
                           <p className="text-xs text-gray-700 mt-1">Visual: {word.visualCue}</p>
                         </div>
                       ))}
@@ -1459,7 +1644,7 @@ export default function Home() {
                       <div className="bg-white rounded p-3 border border-gray-200">
                         <h4 className="font-medium text-orange-800 mb-2">Pause Points</h4>
                         <div className="space-y-2">
-                          {readabilityContent.readingPaceGuide.paceGuide?.pausePoints?.map((pause: any, idx: number) => (
+                          {readabilityContent.readingPaceGuide.paceGuide?.pausePoints?.map((pause, idx: number) => (
                             <div key={idx} className="text-xs text-gray-900 font-medium">
                               <strong>{pause.location}:</strong> {pause.reason} ({pause.duration})
                             </div>
@@ -1478,7 +1663,7 @@ export default function Home() {
                       <div className="bg-white rounded p-3 border border-gray-200">
                         <h4 className="font-medium text-pink-800 mb-2">Question Prompts</h4>
                         <div className="space-y-2">
-                          {readabilityContent.comprehensionAids.questionPrompts?.map((prompt: any, idx: number) => (
+                          {readabilityContent.comprehensionAids.questionPrompts?.map((prompt, idx: number) => (
                             <div key={idx} className="text-sm">
                               <strong className="text-pink-700">{prompt.type}:</strong>
                               <ul className="ml-4 mt-1 space-y-1">

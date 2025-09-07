@@ -37,7 +37,7 @@ type Book = {
   funFacts: string[];
 };
 
-function extractJsonCandidate(text: string): any {
+function extractJsonCandidate(text: string): Book | null {
   try {
     // Try plain JSON first
     return JSON.parse(text);
@@ -63,16 +63,27 @@ async function generateIllustration(ai: GoogleGenAI, prompt: string): Promise<st
     // Enhance prompt for realistic children's book illustrations
     const enhancedPrompt = `Create a realistic, high-quality children's book illustration. Style: photorealistic, warm and inviting, suitable for ages 3-12. Lighting: soft, natural lighting. Colors: vibrant but not overwhelming. Composition: clean, uncluttered, focus on the main subject. ${prompt}`;
 
+    console.log("Calling Gemini API with model:", MODEL_IMAGE);
+    console.log("Enhanced prompt:", enhancedPrompt);
+    
     const response = await ai.models.generateContent({
       model: MODEL_IMAGE,
       contents: enhancedPrompt,
     });
+    
+    console.log("API Response received:", !!response);
 
     // Look for image data in the response
+    console.log("Response structure:", JSON.stringify(response, null, 2));
+    
     if (response.candidates?.[0]?.content?.parts) {
       for (const part of response.candidates[0].content.parts) {
+        console.log("Part structure:", JSON.stringify(part, null, 2));
+        
+        // Check for inlineData (older format)
         if (part.inlineData) {
           const imageData = part.inlineData.data;
+          console.log("Found inlineData, length:", imageData?.length);
           
           // Generate unique filename
           const timestamp = Date.now();
@@ -87,11 +98,33 @@ async function generateIllustration(ai: GoogleGenAI, prompt: string): Promise<st
           if (imageData) {
             const buffer = Buffer.from(imageData, "base64");
             await writeFile(imagePath, buffer);
+            console.log("Image saved to:", imagePath);
+            return `/images/${filename}`;
+          }
+        }
+        
+        // Check for newer format with direct image data
+        if (part.text && part.text.includes('data:image')) {
+          console.log("Found text with image data");
+          // Extract base64 data from data URL
+          const base64Data = part.text.split(',')[1];
+          if (base64Data) {
+            const timestamp = Date.now();
+            const randomId = Math.random().toString(36).substring(2, 8);
+            const filename = `illustration_${timestamp}_${randomId}.png`;
+            const imagePath = join(process.cwd(), "public", "images", filename);
+            
+            await mkdir(join(process.cwd(), "public", "images"), { recursive: true });
+            
+            const buffer = Buffer.from(base64Data, "base64");
+            await writeFile(imagePath, buffer);
+            console.log("Image saved to:", imagePath);
             return `/images/${filename}`;
           }
         }
       }
     }
+    console.log("No image data found in response");
     return null;
   } catch (error) {
     console.error("Error generating illustration:", error);
@@ -165,13 +198,38 @@ Return strictly valid JSON.`;
 
     // Generate illustrations for all pages
     console.log("Generating illustrations for all pages...");
+    console.log("Pages to illustrate:", data.pages.map(p => ({ hasPrompt: !!p.prompt, prompt: p.prompt })));
+    
     const pagesWithImages = await Promise.all(
       data.pages.map(async (page, index) => {
         if (page.prompt) {
           console.log(`Generating illustration for page ${index + 1}: ${page.prompt}`);
-          const imageUrl = await generateIllustration(ai, page.prompt);
+          let imageUrl = await generateIllustration(ai, page.prompt);
+          
+          // If direct generation fails, try using the individual illustrate API as fallback
+          if (!imageUrl) {
+            console.log(`Direct generation failed for page ${index + 1}, trying fallback...`);
+            try {
+              const fallbackResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/illustrate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt: page.prompt })
+              });
+              
+              if (fallbackResponse.ok) {
+                const fallbackData = await fallbackResponse.json();
+                imageUrl = fallbackData.imageUrl;
+                console.log(`Fallback successful for page ${index + 1}:`, imageUrl);
+              }
+            } catch (fallbackError) {
+              console.error(`Fallback failed for page ${index + 1}:`, fallbackError);
+            }
+          }
+          
+          console.log(`Page ${index + 1} illustration result:`, imageUrl);
           return { ...page, imageUrl };
         }
+        console.log(`Page ${index + 1} has no prompt, skipping illustration`);
         return page;
       })
     );
@@ -234,8 +292,8 @@ Return strictly valid JSON.`;
       const bookWithId = { ...illustratedBook, id: `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}` };
       return NextResponse.json({ book: bookWithId });
     }
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message || "Unknown error" }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Unknown error" }, { status: 500 });
   }
 }
 

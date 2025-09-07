@@ -19,7 +19,7 @@ const BodySchema = z.object({
 
 const MODEL_TEXT = process.env.GEMINI_TEXT_MODEL || "gemini-2.5-flash";
 
-function extractJsonFromText(text: string): any | null {
+function extractJsonFromText(text: string): Record<string, unknown> | null {
   try {
     const patterns = [
       /\{[\s\S]*\}/,
@@ -36,7 +36,7 @@ function extractJsonFromText(text: string): any | null {
     }
     
     return JSON.parse(text);
-  } catch (e) {
+  } catch {
     return null;
   }
 }
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
     const { bookId, pageText, readingLevel, childAge, features } = parsed.data;
     const ai = new GoogleGenAI({ apiKey });
 
-    const readabilityContent: any = {};
+    const readabilityContent: Record<string, unknown> = {};
 
     // Text simplification with multiple levels
     if (features.includes("text_simplification")) {
@@ -571,12 +571,12 @@ export async function POST(req: NextRequest) {
       readabilityScore: calculateReadabilityScore(readabilityContent, childAge)
     });
 
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message || "Unknown error" }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Unknown error" }, { status: 500 });
   }
 }
 
-function calculateReadabilityScore(content: any, childAge: number): number {
+function calculateReadabilityScore(content: Record<string, unknown>, childAge: number): number {
   let score = 0;
   
   // Base score

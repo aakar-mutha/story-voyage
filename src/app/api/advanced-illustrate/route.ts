@@ -126,15 +126,28 @@ export async function POST(req: NextRequest) {
         }
       });
     }
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message || "Unknown error" }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Unknown error" }, { status: 500 });
   }
 }
 
-async function processImageResponse(response: any, pageIndex?: number): Promise<string | null> {
+interface ImageResponse {
+  candidates?: Array<{
+    content?: {
+      parts?: Array<{
+        inlineData?: {
+          data?: string;
+        };
+      }>;
+    };
+  }>;
+}
+
+async function processImageResponse(response: unknown, pageIndex?: number): Promise<string | null> {
   try {
-    if (response.candidates?.[0]?.content?.parts) {
-      for (const part of response.candidates[0].content.parts) {
+    const imageResponse = response as ImageResponse;
+    if (imageResponse.candidates?.[0]?.content?.parts) {
+      for (const part of imageResponse.candidates[0].content.parts) {
         if (part.inlineData) {
           const imageData = part.inlineData.data;
           

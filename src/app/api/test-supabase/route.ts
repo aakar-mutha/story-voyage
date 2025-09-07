@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 
 export async function GET() {
@@ -22,10 +22,10 @@ export async function GET() {
       message: "Supabase connection working",
       data 
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     return NextResponse.json({ 
       success: false, 
-      error: err?.message || "Unknown error" 
+      error: err instanceof Error ? err.message : "Unknown error" 
     });
   }
 }

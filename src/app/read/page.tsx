@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabase, Book } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import { ArrowLeft, Share2 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 
-export default function ReadPage() {
+function ReadPageContent() {
   const [book, setBook] = useState<Book | null>(null);
   const [loading, setLoading] = useState(true);
   const [pageIdx, setPageIdx] = useState(0);
@@ -31,28 +31,28 @@ export default function ReadPage() {
 
         if (error) throw error;
         setBook(data);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Error loading book:", err);
-        toast.error("Failed to load story", { description: err?.message });
+        toast.error("Failed to load story", { description: err instanceof Error ? err.message : "Unknown error" });
       } finally {
         setLoading(false);
       }
     }
 
     loadBook();
-  }, [bookId, supabase]);
+  }, [bookId]);
 
-  function nextPage() {
+  const nextPage = useCallback(() => {
     if (book && pageIdx < book.pages.length - 1) {
       setPageIdx(pageIdx + 1);
     }
-  }
+  }, [book, pageIdx]);
 
-  function prevPage() {
+  const prevPage = useCallback(() => {
     if (pageIdx > 0) {
       setPageIdx(pageIdx - 1);
     }
-  }
+  }, [pageIdx]);
 
 
   async function shareStory() {
@@ -65,8 +65,8 @@ export default function ReadPage() {
       
       await navigator.clipboard.writeText(shareContent);
       toast.success("Story link copied to clipboard!");
-    } catch (e: any) {
-      toast.error("Failed to copy link", { description: e?.message });
+    } catch (e: unknown) {
+      toast.error("Failed to copy link", { description: e instanceof Error ? e.message : "Unknown error" });
     }
   }
 
@@ -118,7 +118,7 @@ export default function ReadPage() {
 
     window.addEventListener("keydown", handleKeyPress);
     return () => window.removeEventListener("keydown", handleKeyPress);
-  }, [pageIdx]);
+  }, [pageIdx, nextPage, prevPage]);
 
   if (loading) {
     return (
@@ -136,7 +136,7 @@ export default function ReadPage() {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-gray-900 mb-4">Story Not Found</h1>
-          <p className="text-gray-600 mb-6">The story you're looking for doesn't exist or has been removed.</p>
+          <p className="text-gray-600 mb-6">The story you&apos;re looking for doesn&apos;t exist or has been removed.</p>
           <Link href="/">
             <Button>
               <ArrowLeft className="w-4 h-4 mr-2" />
@@ -285,5 +285,20 @@ export default function ReadPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ReadPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-white/90">Loading story...</p>
+        </div>
+      </div>
+    }>
+      <ReadPageContent />
+    </Suspense>
   );
 }

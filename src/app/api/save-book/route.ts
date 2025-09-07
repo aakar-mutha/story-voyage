@@ -20,7 +20,7 @@ const BodySchema = z.object({
     prompt: z.string().optional(),
     imageUrl: z.string().optional()
   })),
-  glossary: z.record(z.string()).optional(),
+  glossary: z.record(z.string(), z.string()).optional(),
   funFacts: z.array(z.string()).optional()
 });
 
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
     if (error) throw error;
     
     return NextResponse.json({ book: data });
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message || "Unknown error" }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Unknown error" }, { status: 500 });
   }
 }

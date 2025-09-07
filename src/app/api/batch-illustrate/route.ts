@@ -97,22 +97,22 @@ export async function POST(req: NextRequest) {
       }
     });
 
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Batch illustration error:", err);
-    return NextResponse.json({ error: err?.message || "Unknown error" }, { status: 500 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Unknown error" }, { status: 500 });
   }
 }
 
 async function generatePageIllustration(
   ai: GoogleGenAI,
-  page: any,
+  page: { text: string; prompt: string; pageIndex: number },
   pageIndex: number,
   characterDescription: string | undefined,
   style: string,
   consistencyMode: boolean,
   fusionMode: boolean,
-  allPages: any[]
-): Promise<any> {
+  _allPages: { text: string; prompt: string; pageIndex: number }[]
+): Promise<{ success: boolean; pageIndex: number; imageUrl?: string; error?: string; prompt?: string; text?: string; features?: Record<string, string> }> {
   try {
     // Build enhanced prompt for this specific page
     let enhancedPrompt = `Create a high-quality children's book illustration for page ${pageIndex + 1}. `;
@@ -140,7 +140,6 @@ async function generatePageIllustration(
     
     // Scene continuity - reference previous pages
     if (pageIndex > 0) {
-      const previousPage = allPages[pageIndex - 1];
       enhancedPrompt += `This is a continuation of the story. Maintain visual continuity with previous scenes. `;
     }
     
@@ -174,8 +173,8 @@ async function generatePageIllustration(
       text: page.text,
       features: {
         style,
-        consistencyMode,
-        fusionMode,
+        consistencyMode: consistencyMode ? "Enabled" : "Disabled",
+        fusionMode: fusionMode ? "Enabled" : "Disabled",
         characterDescription: characterDescription ? "Applied" : "None"
       }
     };
@@ -190,10 +189,23 @@ async function generatePageIllustration(
   }
 }
 
-async function processImageResponse(response: any, pageIndex: number): Promise<string | null> {
+interface ImageResponse {
+  candidates?: Array<{
+    content?: {
+      parts?: Array<{
+        inlineData?: {
+          data?: string;
+        };
+      }>;
+    };
+  }>;
+}
+
+async function processImageResponse(response: unknown, pageIndex: number): Promise<string | null> {
   try {
-    if (response.candidates?.[0]?.content?.parts) {
-      for (const part of response.candidates[0].content.parts) {
+    const imageResponse = response as ImageResponse;
+    if (imageResponse.candidates?.[0]?.content?.parts) {
+      for (const part of imageResponse.candidates[0].content.parts) {
         if (part.inlineData) {
           const imageData = part.inlineData.data;
           

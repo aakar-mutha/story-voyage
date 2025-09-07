@@ -38,12 +38,12 @@ export async function POST(req: NextRequest) {
       default:
         return NextResponse.json({ error: "Invalid action" }, { status: 400 });
     }
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message || "Unknown error" }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Unknown error" }, { status: 500 });
   }
 }
 
-async function generateShareImage(bookId: string, bookData: any) {
+async function generateShareImage(bookId: string, bookData: { title: string; subtitle: string; city: string; childName: string; pages: Array<{ text: string; imageUrl?: string }> } | undefined) {
   // Generate a beautiful shareable image for social media
   const shareData = {
     bookId,
@@ -64,7 +64,7 @@ async function generateShareImage(bookId: string, bookData: any) {
   });
 }
 
-async function createBookSummary(bookId: string, bookData: any) {
+async function createBookSummary(bookId: string, bookData: { title: string; subtitle: string; city: string; childName: string; pages: Array<{ text: string; imageUrl?: string }> } | undefined) {
   if (!bookData) {
     return NextResponse.json({ error: "Book data required for summary" }, { status: 400 });
   }
@@ -76,7 +76,7 @@ async function createBookSummary(bookId: string, bookData: any) {
     city: bookData.city,
     childName: bookData.childName,
     pageCount: bookData.pages.length,
-    readingTime: Math.ceil(bookData.pages.reduce((acc: number, page: any) => acc + page.text.split(' ').length, 0) / 200), // ~200 words per minute
+    readingTime: Math.ceil(bookData.pages.reduce((acc: number, page: { text: string }) => acc + page.text.split(' ').length, 0) / 200), // ~200 words per minute
     keyThemes: extractThemes(bookData.pages),
     educationalValue: {
       vocabularyWords: extractVocabulary(bookData.pages),
@@ -84,8 +84,8 @@ async function createBookSummary(bookId: string, bookData: any) {
       readingLevel: "Adaptive"
     },
     accessibility: {
-      hasImages: bookData.pages.some((page: any) => page.imageUrl),
-      textLength: bookData.pages.reduce((acc: number, page: any) => acc + page.text.length, 0),
+      hasImages: bookData.pages.some((page: { imageUrl?: string }) => page.imageUrl),
+      textLength: bookData.pages.reduce((acc: number, page: { text: string }) => acc + page.text.length, 0),
       estimatedAgeRange: "3-12 years"
     }
   };
@@ -97,7 +97,7 @@ async function createBookSummary(bookId: string, bookData: any) {
   });
 }
 
-async function generateAudioExport(bookId: string, bookData: any) {
+async function generateAudioExport(bookId: string, bookData: { title: string; subtitle: string; city: string; childName: string; pages: Array<{ text: string; imageUrl?: string }> } | undefined) {
   if (!bookData) {
     return NextResponse.json({ error: "Book data required for audio export" }, { status: 400 });
   }
@@ -147,7 +147,7 @@ async function generateQRCode(bookId: string) {
   });
 }
 
-function extractThemes(pages: any[]): string[] {
+function extractThemes(pages: { text: string }[]): string[] {
   // Simple theme extraction - in a real app, this would use AI
   const themes = new Set<string>();
   const text = pages.map(p => p.text).join(' ').toLowerCase();
@@ -161,7 +161,7 @@ function extractThemes(pages: any[]): string[] {
   return Array.from(themes);
 }
 
-function extractVocabulary(pages: any[]): string[] {
+function extractVocabulary(pages: { text: string }[]): string[] {
   // Simple vocabulary extraction - in a real app, this would use AI
   const words = new Set<string>();
   const text = pages.map(p => p.text).join(' ');

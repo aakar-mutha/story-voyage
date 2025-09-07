@@ -20,7 +20,7 @@ const BodySchema = z.object({
 
 const MODEL_TEXT = process.env.GEMINI_TEXT_MODEL || "gemini-2.5-flash";
 
-function extractJsonFromText(text: string): any | null {
+function extractJsonFromText(text: string): Record<string, unknown> | null {
   try {
     // Try to find JSON in various formats
     const patterns = [
@@ -39,7 +39,7 @@ function extractJsonFromText(text: string): any | null {
     
     // Try parsing the entire text as JSON
     return JSON.parse(text);
-  } catch (e) {
+  } catch {
     return null;
   }
 }
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
     const { bookId, pageText, imageUrl, readingLevel, childAge, features } = parsed.data;
     const ai = new GoogleGenAI({ apiKey });
 
-    const accessibilityContent: any = {};
+    const accessibilityContent: Record<string, unknown> = {};
 
     // Generate alt text for images
     if (features.includes("alt_text_generation") && imageUrl) {
@@ -333,7 +333,7 @@ export async function POST(req: NextRequest) {
       }
     });
 
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message || "Unknown error" }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Unknown error" }, { status: 500 });
   }
 }

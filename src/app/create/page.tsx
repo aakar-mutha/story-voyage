@@ -1,18 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
-import { BookOpen, Sparkles, Globe, Heart, Star, ArrowRight, ArrowLeft, Wand2 } from "lucide-react";
+import { BookOpen, Sparkles, ArrowRight, ArrowLeft, Wand2 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 const STORAGE_KEY = "nano_travel_books_v1";
 
@@ -31,7 +29,6 @@ type Book = {
 };
 
 export default function CreatePage() {
-  const router = useRouter();
   const [city, setCity] = useState("");
   const [name, setName] = useState("");
   const [age, setAge] = useState<number>(8);
@@ -110,10 +107,10 @@ export default function CreatePage() {
       
       setGeneratedBook(safeBook);
       toast.success("Story created!", { description: safeBook.title });
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error("Generation error:", e);
-      setError(e?.message || "Something went wrong");
-      toast.error("Failed to create story", { description: e?.message });
+      setError(e instanceof Error ? e.message : "Something went wrong");
+      toast.error("Failed to create story", { description: e instanceof Error ? e.message : "Unknown error" });
     } finally {
       setLoading(false);
     }
@@ -154,7 +151,7 @@ export default function CreatePage() {
                 Your Story is Ready!
               </h1>
               <p className="text-xl text-white/90 mb-8">
-                "{generatedBook.title}" has been created for {generatedBook.child?.name || 'your child'}
+                &quot;{generatedBook.title}&quot; has been created for {generatedBook.child?.name || 'your child'}
               </p>
               <div className="flex items-center justify-center gap-4 mb-12">
                 <Button asChild size="lg" className="kid-button">
@@ -256,7 +253,7 @@ export default function CreatePage() {
                   </div>
                   <div className="grid grid-cols-2 gap-6">
                     <div className="space-y-2">
-                      <Label htmlFor="name" className="text-lg font-medium">Child's Name</Label>
+                      <Label htmlFor="name" className="text-lg font-medium">Child&apos;s Name</Label>
                       <Input 
                         id="name" 
                         value={name} 
