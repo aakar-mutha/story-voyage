@@ -3,6 +3,7 @@ import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
+import { uploadImageToStorage } from "@/lib/supabase";
 
 const BodySchema = z.object({
   bookId: z.string(),
@@ -209,20 +210,17 @@ async function processImageResponse(response: unknown, pageIndex: number): Promi
         if (part.inlineData) {
           const imageData = part.inlineData.data;
           
-          // Generate unique filename with page index
-          const timestamp = Date.now();
-          const randomId = Math.random().toString(36).substring(2, 8);
-          const filename = `batch_illustration_${timestamp}_page${pageIndex + 1}_${randomId}.png`;
-          const imagePath = join(process.cwd(), "public", "images", filename);
-          
-          // Ensure images directory exists
-          await mkdir(join(process.cwd(), "public", "images"), { recursive: true });
-          
-          // Save image to filesystem
           if (imageData) {
             const buffer = Buffer.from(imageData, "base64");
-            await writeFile(imagePath, buffer);
-            return `/images/${filename}`;
+            
+            // Generate unique filename with page index
+            const timestamp = Date.now();
+            const randomId = Math.random().toString(36).substring(2, 8);
+            const filename = `batch_illustration_${timestamp}_page${pageIndex + 1}_${randomId}.png`;
+            
+            // Upload to Supabase storage
+            const imageUrl = await uploadImageToStorage(buffer, filename);
+            return imageUrl;
           }
         }
       }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
-import { supabase } from "@/lib/supabase";
+import { supabase, uploadImageToStorage } from "@/lib/supabase";
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 
@@ -72,7 +72,7 @@ async function generateIllustration(ai: GoogleGenAI, prompt: string): Promise<st
     });
     
     console.log("API Response received:", !!response);
-
+    
     // Look for image data in the response
     console.log("Response structure:", JSON.stringify(response, null, 2));
     
@@ -85,21 +85,20 @@ async function generateIllustration(ai: GoogleGenAI, prompt: string): Promise<st
           const imageData = part.inlineData.data;
           console.log("Found inlineData, length:", imageData?.length);
           
-          // Generate unique filename
-          const timestamp = Date.now();
-          const randomId = Math.random().toString(36).substring(2, 8);
-          const filename = `illustration_${timestamp}_${randomId}.png`;
-          const imagePath = join(process.cwd(), "public", "images", filename);
-          
-          // Ensure images directory exists
-          await mkdir(join(process.cwd(), "public", "images"), { recursive: true });
-          
-          // Save image to filesystem
           if (imageData) {
             const buffer = Buffer.from(imageData, "base64");
-            await writeFile(imagePath, buffer);
-            console.log("Image saved to:", imagePath);
-            return `/images/${filename}`;
+            
+            // Generate unique filename
+            const timestamp = Date.now();
+            const randomId = Math.random().toString(36).substring(2, 8);
+            const filename = `illustration_${timestamp}_${randomId}.png`;
+            
+            // Upload to Supabase storage
+            const imageUrl = await uploadImageToStorage(buffer, filename);
+            if (imageUrl) {
+              console.log("Image uploaded to Supabase:", imageUrl);
+              return imageUrl;
+            }
           }
         }
         
@@ -109,17 +108,19 @@ async function generateIllustration(ai: GoogleGenAI, prompt: string): Promise<st
           // Extract base64 data from data URL
           const base64Data = part.text.split(',')[1];
           if (base64Data) {
+            const buffer = Buffer.from(base64Data, "base64");
+            
+            // Generate unique filename
             const timestamp = Date.now();
             const randomId = Math.random().toString(36).substring(2, 8);
             const filename = `illustration_${timestamp}_${randomId}.png`;
-            const imagePath = join(process.cwd(), "public", "images", filename);
             
-            await mkdir(join(process.cwd(), "public", "images"), { recursive: true });
-            
-            const buffer = Buffer.from(base64Data, "base64");
-            await writeFile(imagePath, buffer);
-            console.log("Image saved to:", imagePath);
-            return `/images/${filename}`;
+            // Upload to Supabase storage
+            const imageUrl = await uploadImageToStorage(buffer, filename);
+            if (imageUrl) {
+              console.log("Image uploaded to Supabase:", imageUrl);
+              return imageUrl;
+            }
           }
         }
       }

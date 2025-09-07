@@ -3,6 +3,7 @@ import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
+import { uploadImageToStorage } from "@/lib/supabase";
 
 const BodySchema = z.object({
   prompt: z.string().min(5),
@@ -72,26 +73,24 @@ export async function POST(req: NextRequest) {
         if (part.inlineData) {
           const imageData = part.inlineData.data;
           
-          // Generate unique filename
-          const timestamp = Date.now();
-          const randomId = Math.random().toString(36).substring(2, 8);
-          const filename = `illustration_${timestamp}_${randomId}.png`;
-          const imagePath = join(process.cwd(), "public", "images", filename);
-          
-          // Ensure images directory exists
-          await mkdir(join(process.cwd(), "public", "images"), { recursive: true });
-          
-          // Save image to filesystem
           if (imageData) {
             const buffer = Buffer.from(imageData, "base64");
-            await writeFile(imagePath, buffer);
+            
+            // Generate unique filename
+            const timestamp = Date.now();
+            const randomId = Math.random().toString(36).substring(2, 8);
+            const filename = `illustration_${timestamp}_${randomId}.png`;
+            
+            // Upload to Supabase storage
+            const imageUrl = await uploadImageToStorage(buffer, filename);
+            if (imageUrl) {
+              return NextResponse.json({ imageUrl });
+            } else {
+              throw new Error("Failed to upload image to storage");
+            }
           } else {
             throw new Error("No image data received");
           }
-          
-          // Return public URL
-          const imageUrl = `/images/${filename}`;
-          return NextResponse.json({ imageUrl });
         }
       }
     }
