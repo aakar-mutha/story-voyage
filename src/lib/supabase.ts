@@ -50,18 +50,8 @@ export async function uploadImageToStorage(
       })
 
     if (error) {
-      // If bucket doesn't exist or other error, fallback to local storage
       console.warn(`Failed to upload to Supabase storage: ${error.message}`)
-      console.warn('Falling back to local file storage...')
-      
-      // Fallback to local storage
-      const { writeFile, mkdir } = await import('fs/promises');
-      const { join } = await import('path');
-      
-      const imagePath = join(process.cwd(), "public", "images", filename);
-      await mkdir(join(process.cwd(), "public", "images"), { recursive: true });
-      await writeFile(imagePath, imageBuffer);
-      return `/images/${filename}`;
+      return null;
     }
 
     // Get the public URL

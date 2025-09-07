@@ -189,7 +189,7 @@ function ReadPageContent() {
 
       {/* Cover Flow */}
       <div 
-        className="h-full flex items-center justify-center pt-20 pb-20"
+        className="h-full flex items-center justify-center pt-20 pb-20 px-4"
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
@@ -215,7 +215,7 @@ function ReadPageContent() {
               return (
                 <div
                   key={index}
-                  className="absolute w-full max-w-lg h-4/5 transition-all duration-500 ease-out cursor-pointer"
+                  className="absolute w-full max-w-lg max-h-[calc(100vh-12rem)] transition-all duration-500 ease-out cursor-pointer"
                   style={{
                     transform: `translateX(${translateX}%) translateZ(${translateZ}px) rotateY(${rotateY}deg) scale(${scale})`,
                     opacity,
@@ -226,9 +226,9 @@ function ReadPageContent() {
                     if (isNext) nextPage();
                   }}
                 >
-                  <div className="w-full h-full bg-white rounded-2xl shadow-2xl overflow-hidden">
+                  <div className="w-full h-full bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col">
                     {page.imageUrl && (
-                      <div className="h-1/2">
+                      <div className="h-1/2 flex-shrink-0">
                         <img
                           src={page.imageUrl}
                           alt={`Page ${index + 1}`}
@@ -236,14 +236,16 @@ function ReadPageContent() {
                         />
                       </div>
                     )}
-                    <div className="h-1/2 p-6 flex flex-col justify-center">
-                      <div className="text-center">
-                        <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                    <div className="h-1/2 p-6 flex flex-col justify-center flex-shrink-0 min-h-0">
+                      <div className="text-center h-full flex flex-col justify-center">
+                        <h3 className="text-lg font-semibold text-gray-800 mb-2 flex-shrink-0">
                           Page {index + 1}
                         </h3>
-                        <p className="text-gray-600 leading-relaxed">
-                          {page.text}
-                        </p>
+                        <div className="flex-1 overflow-y-auto">
+                          <p className="text-gray-600 leading-relaxed text-sm">
+                            {page.text}
+                          </p>
+                        </div>
                       </div>
                     </div>
                   </div>

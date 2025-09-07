@@ -134,9 +134,11 @@ async function generatePageIllustration(
         break;
     }
     
-    // Character consistency across all pages
-    if (consistencyMode && characterDescription) {
+    // Character consistency - always enforce when character description is available
+    if (characterDescription) {
       enhancedPrompt += `Character consistency: Maintain the same character appearance as described: ${characterDescription}. `;
+    } else if (consistencyMode) {
+      enhancedPrompt += `Character consistency: Maintain consistent character appearance throughout the story. `;
     }
     
     // Scene continuity - reference previous pages

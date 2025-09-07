@@ -58,10 +58,19 @@ function extractJsonCandidate(text: string): Book | null {
   throw new Error("Unable to parse JSON from model output");
 }
 
-async function generateIllustration(ai: GoogleGenAI, prompt: string): Promise<string | null> {
+async function generateIllustration(ai: GoogleGenAI, prompt: string, characterDescription?: string): Promise<string | null> {
   try {
-    // Enhance prompt for realistic children's book illustrations
-    const enhancedPrompt = `Create a realistic, high-quality children's book illustration. Style: photorealistic, warm and inviting, suitable for ages 3-12. Lighting: soft, natural lighting. Colors: vibrant but not overwhelming. Composition: clean, uncluttered, focus on the main subject. ${prompt}`;
+    // Enhance prompt for realistic children's book illustrations with character consistency
+    let enhancedPrompt = `Create a realistic, high-quality children's book illustration. Style: photorealistic, warm and inviting, suitable for ages 3-12. `;
+    
+    // Add character consistency if character description is available
+    if (characterDescription) {
+      enhancedPrompt += `Character consistency: Maintain the same character appearance as described: ${characterDescription}. `;
+    } else {
+      enhancedPrompt += `Character consistency: Maintain consistent character appearance throughout the story. `;
+    }
+    
+    enhancedPrompt += `Lighting: soft, natural lighting. Colors: vibrant but not overwhelming. Composition: clean, uncluttered, focus on the main subject. ${prompt}`;
 
     console.log("Calling Gemini API with model:", MODEL_IMAGE);
     console.log("Enhanced prompt:", enhancedPrompt);
@@ -201,11 +210,14 @@ Return strictly valid JSON.`;
     console.log("Generating illustrations for all pages...");
     console.log("Pages to illustrate:", data.pages.map(p => ({ hasPrompt: !!p.prompt, prompt: p.prompt })));
     
+    // Create character description from child data
+    const characterDescription = data.child?.name ? `A ${data.child.age}-year-old child named ${data.child.name}` : undefined;
+    
     const pagesWithImages = await Promise.all(
       data.pages.map(async (page, index) => {
         if (page.prompt) {
           console.log(`Generating illustration for page ${index + 1}: ${page.prompt}`);
-          let imageUrl = await generateIllustration(ai, page.prompt);
+          let imageUrl = await generateIllustration(ai, page.prompt, characterDescription);
           
           // If direct generation fails, try using the individual illustrate API as fallback
           if (!imageUrl) {
@@ -214,7 +226,11 @@ Return strictly valid JSON.`;
               const fallbackResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/illustrate`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt: page.prompt })
+                body: JSON.stringify({ 
+                  prompt: page.prompt,
+                  characterDescription,
+                  consistencyMode: true
+                })
               });
               
               if (fallbackResponse.ok) {

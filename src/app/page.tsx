@@ -197,7 +197,7 @@ export default function Home() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [illustrationStyle, setIllustrationStyle] = useState("realistic");
-  const [consistencyMode, setConsistencyMode] = useState(false);
+  const [consistencyMode, setConsistencyMode] = useState(true); // Always enable character consistency
   const [showEducationalFeatures, setShowEducationalFeatures] = useState(false);
   const [educationalContent, setEducationalContent] = useState<EducationalContent | null>(null);
   const [showAccessibilityFeatures, setShowAccessibilityFeatures] = useState(false);
@@ -334,7 +334,7 @@ export default function Home() {
     }
   }
 
-  async function illustrateCurrentPage(style: string = "realistic", consistencyMode: boolean = false) {
+  async function illustrateCurrentPage(style: string = "realistic", consistencyMode: boolean = true) {
     if (!active || !active.pages[pageIdx]?.prompt) return;
     
     setIsIllustrating(true);
@@ -345,7 +345,7 @@ export default function Home() {
         body: JSON.stringify({ 
           prompt: active.pages[pageIdx].prompt,
           style,
-          consistencyMode,
+          consistencyMode: true, // Always enable character consistency
           characterDescription: active.child?.name ? `A ${active.child.age}-year-old child named ${active.child.name}` : undefined,
           previousImageUrl: pageIdx > 0 ? active.pages[pageIdx - 1]?.imageUrl : undefined,
           editMode: pageIdx > 0
@@ -523,7 +523,7 @@ export default function Home() {
           pages: pagesWithPrompts,
           characterDescription: active.child?.name ? `A ${active.child.age}-year-old child named ${active.child.name}` : undefined,
           style: illustrationStyle,
-          consistencyMode: consistencyMode,
+          consistencyMode: true, // Always enable character consistency
           fusionMode: true,
           batchSize: 3
         }),
@@ -679,15 +679,15 @@ export default function Home() {
               <div className="text-white/70 text-sm">
                 Page {pageIdx + 1} of {active.pages.length}
               </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => illustrateCurrentPage(illustrationStyle, consistencyMode)}
-                    className="text-white hover:bg-white/20"
-                  >
-                    <Sparkles className="w-4 h-4 mr-2" />
-                    Illustrate
-                  </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                    onClick={() => illustrateCurrentPage(illustrationStyle, true)}
+                className="text-white hover:bg-white/20"
+              >
+                <Sparkles className="w-4 h-4 mr-2" />
+                Illustrate
+              </Button>
             </div>
           </div>
         </div>
@@ -716,8 +716,8 @@ export default function Home() {
                 const rotateY = distance * 15;
                 const scale = isActive ? 1 : 0.8;
                 const opacity = isActive ? 1 : isPrev || isNext ? 0.6 : 0.3;
-
-                return (
+                
+  return (
                   <div
                     key={index}
                     className="absolute w-full max-w-lg h-4/5 transition-all duration-500 ease-out cursor-pointer"
@@ -732,10 +732,10 @@ export default function Home() {
                     }}
                   >
                     <div className="w-full h-full bg-white rounded-2xl shadow-2xl overflow-hidden">
-                      {page.imageUrl && (
+                        {page.imageUrl && (
                         <div className="h-1/2">
-                          <img
-                            src={page.imageUrl}
+                            <img 
+                              src={page.imageUrl} 
                             alt={`Page ${index + 1}`}
                             className="w-full h-full object-cover"
                             onError={(e) => {
@@ -746,8 +746,8 @@ export default function Home() {
                               console.log('Image loaded successfully:', page.imageUrl);
                             }}
                           />
-                        </div>
-                      )}
+                          </div>
+                        )}
                       <div className="h-1/2 p-6 flex flex-col justify-center">
                         <div className="text-center">
                           <h3 className="text-lg font-semibold text-gray-800 mb-2">
@@ -763,7 +763,7 @@ export default function Home() {
                                 <h4 className="text-sm font-semibold text-amber-900">
                                   Try This Activity!
                                 </h4>
-                              </div>
+                                </div>
                               <p className="text-xs text-amber-800">
                                 {page.activity}
                               </p>
@@ -812,7 +812,7 @@ export default function Home() {
   return (
     <div className="w-full h-screen overflow-hidden">
       <SidebarProvider>
-        <div className="min-h-screen w-full bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col">
+        <div className="h-screen w-full bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col overflow-hidden">
           {/* Header - Only show when no story is active */}
           {!active && (
             <div className="border-b border-border/50 p-6 w-full">
@@ -897,12 +897,12 @@ export default function Home() {
           )}
 
           {/* Content Area with Sidebar */}
-          <div className="flex-1 flex">
+          <div className="flex-1 flex min-h-0">
             {/* Sidebar - Hidden when story is open */}
             {!active && sidebarOpen && (
-              <div className="w-80 lg:w-96 xl:w-80 border-r border-border/50 transition-all duration-300 ease-in-out bg-slate-900/50">
-                <div className="p-4 h-full overflow-y-auto">
-                  <div className="space-y-4">
+              <div className="w-80 lg:w-96 xl:w-80 border-r border-border/50 transition-all duration-300 ease-in-out bg-slate-900/50 flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
+                <div className="p-4 flex-1 sidebar-scroll h-fit" >
+                  <div className="space-y-4 pb-6">
                     {books.length > 0 && (
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
@@ -1114,17 +1114,17 @@ export default function Home() {
                         <input
                           type="checkbox"
                           checked={consistencyMode}
-                          onChange={(e) => setConsistencyMode(e.target.checked)}
-                          className="w-3 h-3"
+                          disabled={true}
+                          className="w-3 h-3 opacity-50"
                         />
-                        Consistency
+                        Consistency (Always On)
                       </label>
                     </div>
                     
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => illustrateCurrentPage(illustrationStyle, consistencyMode)}
+                      onClick={() => illustrateCurrentPage(illustrationStyle, true)}
                       disabled={isIllustrating}
                       className="text-white/70 hover:text-white disabled:opacity-50"
                       title="Generate Advanced Illustration"

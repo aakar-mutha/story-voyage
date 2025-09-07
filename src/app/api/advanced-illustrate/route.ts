@@ -10,7 +10,7 @@ const BodySchema = z.object({
   characterDescription: z.string().optional(),
   previousImageUrl: z.string().optional(),
   style: z.enum(["realistic", "cartoon", "watercolor", "sketch"]).default("realistic"),
-  consistencyMode: z.boolean().default(false),
+  consistencyMode: z.boolean().default(true), // Always enable character consistency by default
   editMode: z.boolean().default(false),
   fusionMode: z.boolean().default(false),
   batchGenerate: z.boolean().default(false),
@@ -65,9 +65,11 @@ export async function POST(req: NextRequest) {
         break;
     }
     
-    // Character consistency for multi-page stories
-    if (consistencyMode && characterDescription) {
+    // Character consistency - always enforce when character description is available
+    if (characterDescription) {
       enhancedPrompt += `Character consistency: Maintain the same character appearance as described: ${characterDescription}. `;
+    } else if (consistencyMode) {
+      enhancedPrompt += `Character consistency: Maintain consistent character appearance throughout the story. `;
     }
     
     // Image editing and fusion capabilities
