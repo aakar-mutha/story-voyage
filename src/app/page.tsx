@@ -454,13 +454,55 @@ export default function Home() {
       // Combine share text and link
       const shareContent = `${data.socialText}\n\nRead the full story: ${shareableLink}`;
       
-      // Copy share content to clipboard
-      await navigator.clipboard.writeText(shareContent);
-      toast.success("Share content and link copied to clipboard!");
+      // Try to copy to clipboard with fallback
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(shareContent);
+          toast.success("Share content and link copied to clipboard!");
+        } else {
+          // Fallback for non-HTTPS or unsupported browsers
+          await fallbackCopyTextToClipboard(shareContent);
+          toast.success("Share content and link copied to clipboard!");
+        }
+      } catch (clipboardError) {
+        // If clipboard fails, show the content in a modal or alert
+        console.warn('Clipboard copy failed:', clipboardError);
+        await fallbackCopyTextToClipboard(shareContent);
+        toast.success("Share content and link copied to clipboard!");
+      }
     } catch (e: unknown) {
       toast.error("Failed to generate share content", { description: e instanceof Error ? e.message : "Unknown error" });
     } finally {
       setIsGeneratingShare(false);
+    }
+  }
+
+  // Fallback function for copying text to clipboard
+  async function fallbackCopyTextToClipboard(text: string) {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    
+    // Avoid scrolling to bottom
+    textArea.style.top = "0";
+    textArea.style.left = "0";
+    textArea.style.position = "fixed";
+    textArea.style.opacity = "0";
+    
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    
+    try {
+      const successful = document.execCommand('copy');
+      if (!successful) {
+        throw new Error('Fallback copy command was unsuccessful');
+      }
+    } catch (err) {
+      console.error('Fallback copy failed:', err);
+      // Last resort: show the text in an alert or modal
+      alert(`Share this content:\n\n${text}`);
+    } finally {
+      document.body.removeChild(textArea);
     }
   }
 
@@ -1166,6 +1208,21 @@ export default function Home() {
                           <div className="w-3 h-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
                         ) : (
                           "📚"
+                        )}
+                      </Button>
+                      
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={loadReadabilityFeatures}
+                        disabled={isLoadingReadability}
+                        className="text-white/70 hover:text-white disabled:opacity-50 p-1.5"
+                        title="Readability Features"
+                      >
+                        {isLoadingReadability ? (
+                          <div className="w-3 h-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                        ) : (
+                          "📖"
                         )}
                       </Button>
                       
