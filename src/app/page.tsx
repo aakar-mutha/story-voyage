@@ -244,6 +244,8 @@ export default function Home() {
   const [readabilityChunks, setReadabilityChunks] = useState<{ [key: string]: any }>({}); // eslint-disable-line @typescript-eslint/no-explicit-any
   const [isGeneratingShare, setIsGeneratingShare] = useState(false);
   const [consistencyMode] = useState(true);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareContent, setShareContent] = useState("");
 
   // Load books from Supabase
   useEffect(() => {
@@ -465,15 +467,38 @@ export default function Home() {
           toast.success("Share content and link copied to clipboard!");
         }
       } catch (clipboardError) {
-        // If clipboard fails, show the content in a modal or alert
+        // If clipboard fails, try fallback method
         console.warn('Clipboard copy failed:', clipboardError);
-        await fallbackCopyTextToClipboard(shareContent);
-        toast.success("Share content and link copied to clipboard!");
+        try {
+          await fallbackCopyTextToClipboard(shareContent);
+          toast.success("Share content and link copied to clipboard!");
+        } catch (fallbackError) {
+          console.error('Both clipboard methods failed:', fallbackError);
+          toast.error("Could not copy to clipboard. Please copy manually from the alert.");
+        }
       }
     } catch (e: unknown) {
       toast.error("Failed to generate share content", { description: e instanceof Error ? e.message : "Unknown error" });
     } finally {
       setIsGeneratingShare(false);
+    }
+  }
+
+  // Function to copy text from modal
+  async function copyFromModal() {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(shareContent);
+        toast.success("Content copied to clipboard!");
+        setShowShareModal(false);
+      } else {
+        await fallbackCopyTextToClipboard(shareContent);
+        toast.success("Content copied to clipboard!");
+        setShowShareModal(false);
+      }
+    } catch (error) {
+      console.error('Modal copy failed:', error);
+      toast.error("Could not copy to clipboard. Please select and copy manually.");
     }
   }
 
@@ -487,6 +512,8 @@ export default function Home() {
     textArea.style.left = "0";
     textArea.style.position = "fixed";
     textArea.style.opacity = "0";
+    textArea.style.pointerEvents = "none";
+    textArea.style.zIndex = "-1";
     
     document.body.appendChild(textArea);
     textArea.focus();
@@ -497,10 +524,12 @@ export default function Home() {
       if (!successful) {
         throw new Error('Fallback copy command was unsuccessful');
       }
+      console.log('Text copied to clipboard using fallback method');
     } catch (err) {
       console.error('Fallback copy failed:', err);
-      // Last resort: show the text in an alert or modal
-      alert(`Share this content:\n\n${text}`);
+      // Last resort: show the text in a modal
+      setShareContent(text);
+      setShowShareModal(true);
     } finally {
       document.body.removeChild(textArea);
     }
@@ -1933,6 +1962,71 @@ export default function Home() {
             </div>
           </div>
         )}
+        
+        {/* Share Modal */}
+        {showShareModal && (
+          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-xl max-w-2xl w-full max-h-[80vh] overflow-hidden">
+              <div className="flex items-center justify-between p-4 border-b">
+                <h3 className="text-lg font-semibold text-gray-900">Share Content</h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowShareModal(false)}
+                  className="text-gray-500 hover:text-gray-700 p-2"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+              
+              <div className="p-4">
+                <p className="text-sm text-gray-600 mb-4">
+                  Copy this content to share your story:
+                </p>
+                <div className="bg-gray-50 rounded-lg p-3 mb-4 max-h-60 overflow-y-auto">
+                  <pre className="text-sm text-gray-900 whitespace-pre-wrap font-mono">
+                    {shareContent}
+                  </pre>
+                </div>
+                
+                <div className="flex items-center gap-3">
+                  <Button
+                    onClick={copyFromModal}
+                    className="flex-1"
+                  >
+                    <Share2 className="w-4 h-4 mr-2" />
+                    Copy to Clipboard
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      navigator.clipboard?.writeText(shareContent);
+                      toast.success("Content copied!");
+                    }}
+                    className="flex-1"
+                  >
+                    Select All & Copy
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Footer */}
+        <div className="border-t border-border/50 p-4 text-center">
+          <p className="text-white/60 text-sm">
+            Made by{" "}
+            <a 
+              href="https://www.aakar.dev/?utm_source=storyvoyage&utm_medium=app&utm_campaign=footer" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-white/80 hover:text-white underline transition-colors"
+            >
+              Aakar
+            </a>
+          </p>
+        </div>
         </div>
       </SidebarProvider>
     </div>
