@@ -1053,13 +1053,13 @@ export default function Home() {
                             }}
                           >
                 {/* Floating Page Card */}
-                <div className="relative w-full max-w-sm sm:w-[500px] sm:h-[700px] bg-white rounded-2xl shadow-2xl overflow-hidden">
+                <div className="relative w-full max-w-sm sm:w-[500px] sm:h-[750px] bg-white rounded-2xl shadow-2xl overflow-hidden">
                             
                             {/* Page Content */}
                             <div className="h-full flex flex-col">
                               {/* Image Section */}
                               {page.imageUrl && (
-                                <div className="relative h-64 sm:h-96 overflow-hidden flex-shrink-0">
+                                <div className="relative h-72 sm:h-[400px] overflow-hidden flex-shrink-0">
                                   <img 
                                     src={page.imageUrl} 
                                     alt="Illustration" 
@@ -1077,7 +1077,7 @@ export default function Home() {
                               )}
                               
                               {/* Text Section - Scrollable on Mobile */}
-                              <div className="flex-1 p-4 sm:p-6 flex flex-col justify-start overflow-y-auto min-h-0">
+                              <div className="flex-1 p-3 sm:p-4 flex flex-col justify-start overflow-y-auto min-h-0">
                                 <div className="prose prose-sm max-w-none text-center">
                                   <p className="text-sm sm:text-base leading-relaxed text-gray-900 font-medium whitespace-pre-wrap">
                                     {page.text}
@@ -1109,7 +1109,7 @@ export default function Home() {
               </div>
 
                 {/* Navigation */}
-                <div className="flex flex-col sm:flex-row items-center justify-between mt-4 sm:mt-6 gap-4">
+                <div className="flex flex-col sm:flex-row items-center justify-between mt-2 sm:mt-3 gap-2 sm:gap-3">
                   <Button
                     variant="ghost"
                     size="sm"
@@ -1125,44 +1125,32 @@ export default function Home() {
                       {pageIdx + 1} / {active.pages.length}
                     </div>
                     
-                    {/* Mobile Controls - Collapsible */}
-                    <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-4 order-2 sm:order-none">
-                      {/* Advanced Illustration Controls */}
-                      <div className="flex items-center gap-2">
-                        <select
-                          value={illustrationStyle}
-                          onChange={(e) => setIllustrationStyle(e.target.value)}
-                          className="bg-white text-gray-900 text-xs px-2 py-1 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                          <option value="realistic" className="text-gray-900">Realistic</option>
-                          <option value="cartoon" className="text-gray-900">Cartoon</option>
-                          <option value="watercolor" className="text-gray-900">Watercolor</option>
-                          <option value="sketch" className="text-gray-900">Sketch</option>
-                        </select>
-                        
-                        <label className="hidden sm:flex items-center gap-1 text-xs text-white">
-                          <input
-                            type="checkbox"
-                            checked={consistencyMode}
-                            disabled={true}
-                            className="w-3 h-3 opacity-50"
-                          />
-                          Consistency
-                        </label>
-                      </div>
+                    {/* Compact Mobile Controls */}
+                    <div className="flex items-center justify-center gap-1 sm:gap-2 order-2 sm:order-none">
+                      {/* Essential Controls Only */}
+                      <select
+                        value={illustrationStyle}
+                        onChange={(e) => setIllustrationStyle(e.target.value)}
+                        className="bg-white text-gray-900 text-xs px-1.5 py-0.5 rounded border border-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      >
+                        <option value="realistic" className="text-gray-900">Realistic</option>
+                        <option value="cartoon" className="text-gray-900">Cartoon</option>
+                        <option value="watercolor" className="text-gray-900">Watercolor</option>
+                        <option value="sketch" className="text-gray-900">Sketch</option>
+                      </select>
                       
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => illustrateCurrentPage(illustrationStyle, true)}
                         disabled={isIllustrating}
-                        className="text-white/70 hover:text-white disabled:opacity-50 p-2"
-                        title="Generate Advanced Illustration"
+                        className="text-white/70 hover:text-white disabled:opacity-50 p-1.5"
+                        title="Generate Illustration"
                       >
                         {isIllustrating ? (
-                          <div className="w-4 h-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                          <div className="w-3 h-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
                         ) : (
-                          <Sparkles className="w-4 h-4" />
+                          <Sparkles className="w-3 h-3" />
                         )}
                       </Button>
                       
@@ -1171,11 +1159,11 @@ export default function Home() {
                         size="sm"
                         onClick={loadEducationalFeatures}
                         disabled={isLoadingEducational}
-                        className="text-white/70 hover:text-white disabled:opacity-50 p-2"
-                        title="Load Educational Features"
+                        className="text-white/70 hover:text-white disabled:opacity-50 p-1.5"
+                        title="Educational Features"
                       >
                         {isLoadingEducational ? (
-                          <div className="w-4 h-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                          <div className="w-3 h-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
                         ) : (
                           "📚"
                         )}
@@ -1184,60 +1172,15 @@ export default function Home() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={loadAccessibilityFeatures}
-                        disabled={isLoadingAccessibility}
-                        className="text-white/70 hover:text-white disabled:opacity-50 p-2"
-                        title="Accessibility Features"
-                      >
-                        {isLoadingAccessibility ? (
-                          <div className="w-4 h-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                        ) : (
-                          "♿"
-                        )}
-                      </Button>
-                      
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={loadReadabilityFeatures}
-                        disabled={isLoadingReadability}
-                        className="text-white/70 hover:text-white disabled:opacity-50 p-2"
-                        title="Readability Enhancements"
-                      >
-                        {isLoadingReadability ? (
-                          <div className="w-4 h-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                        ) : (
-                          "📖"
-                        )}
-                      </Button>
-                      
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={batchIllustrateAllPages}
-                        disabled={isBatchIllustrating}
-                        className="text-white/70 hover:text-white disabled:opacity-50 p-2"
-                        title="Batch Illustrate All Pages"
-                      >
-                        {isBatchIllustrating ? (
-                          <div className="w-4 h-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                        ) : (
-                          "🎨"
-                        )}
-                      </Button>
-                      
-                      <Button
-                        variant="ghost"
-                        size="sm"
                         onClick={generateSocialShare}
                         disabled={isGeneratingShare}
-                        className="text-white/70 hover:text-white disabled:opacity-50 p-2"
+                        className="text-white/70 hover:text-white disabled:opacity-50 p-1.5"
                         title="Share Story"
                       >
                         {isGeneratingShare ? (
-                          <div className="w-4 h-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                          <div className="w-3 h-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
                         ) : (
-                          <Share2 className="w-4 h-4" />
+                          <Share2 className="w-3 h-3" />
                         )}
                       </Button>
                       
@@ -1245,12 +1188,11 @@ export default function Home() {
                         variant="ghost"
                         size="sm"
                         onClick={toggleFullscreen}
-                        className="text-white/70 hover:text-white disabled:opacity-50 p-2"
+                        className="text-white/70 hover:text-white disabled:opacity-50 p-1.5"
                         title="Enter Fullscreen"
                       >
-                        <Maximize className="w-4 h-4" />
+                        <Maximize className="w-3 h-3" />
                       </Button>
-                      
                     </div>
                   </div>
                   

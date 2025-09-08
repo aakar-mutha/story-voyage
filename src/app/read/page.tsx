@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabase, Book } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Share2 } from "lucide-react";
+import { ArrowLeft, Share2, Maximize, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 
@@ -12,6 +12,9 @@ function ReadPageContent() {
   const [book, setBook] = useState<Book | null>(null);
   const [loading, setLoading] = useState(true);
   const [pageIdx, setPageIdx] = useState(0);
+  const [isGeneratingShare, setIsGeneratingShare] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showSwipeHint, setShowSwipeHint] = useState(true);
   const searchParams = useSearchParams();
   const bookId = searchParams.get("id");
 
@@ -42,6 +45,16 @@ function ReadPageContent() {
     loadBook();
   }, [bookId]);
 
+  // Auto-hide swipe hint after 5 seconds
+  useEffect(() => {
+    if (showSwipeHint) {
+      const timer = setTimeout(() => {
+        setShowSwipeHint(false);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [showSwipeHint]);
+
   const nextPage = useCallback(() => {
     if (book && pageIdx < book.pages.length - 1) {
       setPageIdx(pageIdx + 1);
@@ -55,19 +68,50 @@ function ReadPageContent() {
   }, [pageIdx]);
 
 
-  async function shareStory() {
+  async function generateSocialShare() {
     if (!book) return;
     
+    setIsGeneratingShare(true);
     try {
-      const shareableLink = `${window.location.origin}/read?id=${book.id}`;
-      const shareText = `Check out this amazing story: "${book.title}" - ${book.subtitle}`;
-      const shareContent = `${shareText}\n\nRead the full story: ${shareableLink}`;
+      const res = await fetch('/api/social-features', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bookId: book.id,
+          action: "generate_share_image",
+          bookData: {
+            title: book.title,
+            subtitle: book.subtitle,
+            city: book.city,
+            childName: book.child?.name || "Your Child",
+            pages: book.pages.map(page => ({
+              text: page.text,
+              imageUrl: page.imageUrl
+            }))
+          }
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Failed to generate share content");
       
+      // Generate shareable link
+      const shareableLink = `${window.location.origin}/read?id=${book.id}`;
+      
+      // Combine share text and link
+      const shareContent = `${data.socialText}\n\nRead the full story: ${shareableLink}`;
+      
+      // Copy share content to clipboard
       await navigator.clipboard.writeText(shareContent);
-      toast.success("Story link copied to clipboard!");
+      toast.success("Share content and link copied to clipboard!");
     } catch (e: unknown) {
-      toast.error("Failed to copy link", { description: e instanceof Error ? e.message : "Unknown error" });
+      toast.error("Failed to generate share content", { description: e instanceof Error ? e.message : "Unknown error" });
+    } finally {
+      setIsGeneratingShare(false);
     }
+  }
+
+  function toggleFullscreen() {
+    setIsFullscreen(!isFullscreen);
   }
 
   // Touch/swipe handlers
@@ -81,6 +125,10 @@ function ReadPageContent() {
       x: e.targetTouches[0].clientX,
       y: e.targetTouches[0].clientY,
     });
+    // Hide swipe hint when user starts interacting
+    if (showSwipeHint) {
+      setShowSwipeHint(false);
+    }
   };
 
   const onTouchMove = (e: React.TouchEvent) => {
@@ -152,40 +200,45 @@ function ReadPageContent() {
   return (
     <div className="fixed inset-0 z-50 bg-black">
       {/* Header */}
-      <div className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-black/80 to-transparent p-6">
+      <div className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-black/80 to-transparent p-4 sm:p-6">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
             <Link href="/">
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-white hover:bg-white/20"
+                className="text-white hover:bg-white/20 p-2"
               >
-                <ArrowLeft className="w-5 h-5 mr-2" />
-                Back to Library
+                <ArrowLeft className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Back to Library</span>
               </Button>
             </Link>
-            <div>
-              <h1 className="text-2xl font-bold text-white">{book.title}</h1>
-              <p className="text-white/70">{book.subtitle}</p>
+            <div className="min-w-0 flex-1 max-w-md sm:max-w-lg">
+              <h1 className="text-lg sm:text-2xl font-bold text-white truncate">{book.title}</h1>
+              <p className="text-white/70 text-sm sm:text-base line-clamp-2 leading-tight">{book.subtitle}</p>
             </div>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="text-white/70 text-sm">
-              Page {pageIdx + 1} of {book.pages.length}
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={shareStory}
-              className="text-white hover:bg-white/20"
-            >
-              <Share2 className="w-4 h-4 mr-2" />
-              Share
-            </Button>
+          <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+            {/* Header buttons removed - only showing in bottom navigation */}
           </div>
         </div>
       </div>
+
+      {/* Swipe Instruction */}
+      {showSwipeHint && (
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none animate-fade-in">
+          <div className="bg-black/60 backdrop-blur-sm rounded-full px-4 py-2 border border-white/20">
+            <div className="flex items-center gap-2 text-white/80 text-sm">
+              <div className="flex gap-1">
+                <div className="w-1 h-1 bg-white/60 rounded-full animate-pulse"></div>
+                <div className="w-1 h-1 bg-white/60 rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
+                <div className="w-1 h-1 bg-white/60 rounded-full animate-pulse" style={{animationDelay: '0.4s'}}></div>
+              </div>
+              <span className="text-xs">Swipe to navigate</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Cover Flow */}
       <div 
@@ -215,11 +268,13 @@ function ReadPageContent() {
               return (
                 <div
                   key={index}
-                  className="absolute w-full max-w-lg max-h-[calc(100vh-12rem)] transition-all duration-500 ease-out cursor-pointer"
+                  className="absolute w-full max-w-sm sm:w-[500px] sm:h-[750px] transition-all duration-500 ease-out cursor-pointer"
                   style={{
                     transform: `translateX(${translateX}%) translateZ(${translateZ}px) rotateY(${rotateY}deg) scale(${scale})`,
                     opacity,
                     zIndex: isActive ? 10 : 5 - Math.abs(distance),
+                    transformStyle: 'preserve-3d',
+                    backfaceVisibility: 'hidden'
                   }}
                   onClick={() => {
                     if (isPrev) prevPage();
@@ -228,24 +283,26 @@ function ReadPageContent() {
                 >
                   <div className="w-full h-full bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col">
                     {page.imageUrl && (
-                      <div className="h-1/2 flex-shrink-0">
-                        <img
-                          src={page.imageUrl}
-                          alt={`Page ${index + 1}`}
+                      <div className="relative h-72 sm:h-[400px] overflow-hidden flex-shrink-0">
+                        <img 
+                          src={page.imageUrl} 
+                          alt="Illustration" 
                           className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                          }}
                         />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
                       </div>
                     )}
-                    <div className="h-1/2 p-6 flex flex-col justify-center flex-shrink-0 min-h-0">
-                      <div className="text-center h-full flex flex-col justify-center">
-                        <h3 className="text-lg font-semibold text-gray-800 mb-2 flex-shrink-0">
-                          Page {index + 1}
-                        </h3>
-                        <div className="flex-1 overflow-y-auto">
-                          <p className="text-gray-600 leading-relaxed text-sm">
-                            {page.text}
-                          </p>
-                        </div>
+                    
+                    {/* Text Section - Scrollable on Mobile */}
+                    <div className="flex-1 p-3 sm:p-4 flex flex-col justify-start overflow-y-auto min-h-0">
+                      <div className="prose prose-sm max-w-none text-center">
+                        <p className="text-sm sm:text-base leading-relaxed text-gray-900 font-medium whitespace-pre-wrap">
+                          {page.text}
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -256,33 +313,42 @@ function ReadPageContent() {
         </div>
       </div>
 
-      {/* Navigation */}
-      <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/80 to-transparent p-6">
-        <div className="flex items-center justify-between max-w-4xl mx-auto">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={prevPage}
-            disabled={pageIdx === 0}
-            className="text-white hover:bg-white/20 disabled:opacity-50"
-          >
-            ← Previous
-          </Button>
-          
-          <div className="flex items-center gap-4">
-            <div className="text-white/70 text-sm">
-              {pageIdx + 1} / {book.pages.length}
-            </div>
+      {/* Bottom Navigation - 3 Icons */}
+      <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/80 to-transparent p-4 sm:p-6">
+        <div className="flex items-center justify-center gap-8 sm:gap-12">
+          {/* Page Number */}
+          <div className="flex items-center justify-center w-10 h-10 bg-white/20 backdrop-blur-sm rounded-full border border-white/30">
+            <span className="text-white text-sm font-medium">
+              {pageIdx + 1}
+            </span>
           </div>
           
+          {/* Create Your Own */}
+          <Link href="/create">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-white/70 hover:text-white hover:bg-white/20 p-3"
+              title="Create Your Own Story"
+            >
+              <Sparkles className="w-6 h-6" />
+            </Button>
+          </Link>
+          
+          {/* Share */}
           <Button
             variant="ghost"
             size="sm"
-            onClick={nextPage}
-            disabled={pageIdx === book.pages.length - 1}
-            className="text-white hover:bg-white/20 disabled:opacity-50"
+            onClick={generateSocialShare}
+            disabled={isGeneratingShare}
+            className="text-white/70 hover:text-white hover:bg-white/20 disabled:opacity-50 p-3"
+            title="Share Story"
           >
-            Next →
+            {isGeneratingShare ? (
+              <div className="w-6 h-6 animate-spin rounded-full border-2 border-white border-t-transparent" />
+            ) : (
+              <Share2 className="w-6 h-6" />
+            )}
           </Button>
         </div>
       </div>
