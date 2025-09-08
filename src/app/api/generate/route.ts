@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
 import { supabase, uploadImageToStorage } from "@/lib/supabase";
-import { writeFile, mkdir } from "fs/promises";
-import { join } from "path";
 
 const BodySchema = z.object({
   city: z.string().min(2),

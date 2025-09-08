@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { toast } from "sonner";
-import { BookOpen, Sparkles, Share2, Trash2, Wand2, Library, Maximize, X, Menu } from "lucide-react";
+import { BookOpen, Sparkles, Share2, Wand2, Library, Maximize, X } from "lucide-react";
 import Link from "next/link";
 import { supabase, Book } from "@/lib/supabase";
 
@@ -45,38 +45,6 @@ interface EducationalContent {
   };
 }
 
-interface AccessibilityContent {
-  loaded?: boolean;
-  altText?: {
-    altText: string;
-    simpleAltText: string;
-    emotionalContext: string;
-    keyElements: string[];
-  };
-  simplifiedText?: {
-    earlyReader: string;
-    middleReader: string;
-    advancedReader: string;
-    originalText: string;
-    readingLevels: {
-      early: string;
-      middle: string;
-      advanced: string;
-    };
-  };
-  dyslexiaFriendly?: {
-    formatting: {
-      font: string;
-      size: string;
-      lineHeight: string;
-      letterSpacing: string;
-    };
-    colorCoding: Record<string, string>;
-    chunking: string[];
-    visualAids: string[];
-    memoryTechniques: string[];
-  };
-}
 
 
 interface ReadabilityContent {
@@ -156,11 +124,9 @@ interface ReadabilityContent {
   };
 }
 
+
 const STORAGE_KEY = "nano_travel_books_v1";
 
-function encodeShare(book: Book) {
-  return `/read?id=${book.id}`;
-}
 
 function renderColorCodedText(text: string, colorCoding: Record<string, string>) {
   // Enhanced word classification for better color coding
@@ -259,27 +225,25 @@ export default function Home() {
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [illustrationStyle, setIllustrationStyle] = useState("realistic");
-  const [consistencyMode, setConsistencyMode] = useState(true); // Always enable character consistency
   const [showEducationalFeatures, setShowEducationalFeatures] = useState(false);
   const [educationalContent, setEducationalContent] = useState<EducationalContent | null>(null);
   const [showAccessibilityFeatures, setShowAccessibilityFeatures] = useState(false);
-  const [accessibilityContent, setAccessibilityContent] = useState<AccessibilityContent | null>(null);
   const [isBatchIllustrating, setIsBatchIllustrating] = useState(false);
   const [showReadabilityFeatures, setShowReadabilityFeatures] = useState(false);
   const [readabilityContent, setReadabilityContent] = useState<ReadabilityContent | null>(null);
   const [isIllustrating, setIsIllustrating] = useState(false);
   const [isLoadingEducational, setIsLoadingEducational] = useState(false);
   const [educationalProgress, setEducationalProgress] = useState<{ [key: string]: boolean }>({});
-  const [educationalChunks, setEducationalChunks] = useState<{ [key: string]: any }>({});
+  const [educationalChunks, setEducationalChunks] = useState<{ [key: string]: any }>({}); // eslint-disable-line @typescript-eslint/no-explicit-any
   const [isLoadingAccessibility, setIsLoadingAccessibility] = useState(false);
   const [accessibilityProgress, setAccessibilityProgress] = useState<{ [key: string]: boolean }>({});
-  const [accessibilityChunks, setAccessibilityChunks] = useState<{ [key: string]: any }>({});
-  const [isGeneratingShare, setIsGeneratingShare] = useState(false);
+  const [accessibilityChunks, setAccessibilityChunks] = useState<{ [key: string]: any }>({}); // eslint-disable-line @typescript-eslint/no-explicit-any
   const [isLoadingReadability, setIsLoadingReadability] = useState(false);
   const [readabilityProgress, setReadabilityProgress] = useState<{ [key: string]: boolean }>({});
-  const [readabilityChunks, setReadabilityChunks] = useState<{ [key: string]: any }>({});
+  const [readabilityChunks, setReadabilityChunks] = useState<{ [key: string]: any }>({}); // eslint-disable-line @typescript-eslint/no-explicit-any
+  const [isGeneratingShare, setIsGeneratingShare] = useState(false);
+  const [consistencyMode] = useState(true);
 
   // Load books from Supabase
   useEffect(() => {
@@ -358,50 +322,9 @@ export default function Home() {
     }
   }, [books]);
 
-  async function _deleteBook(bookId: string) {
-    try {
-      // Try to delete from Supabase first
-      const { error } = await supabase
-        .from('books')
-        .delete()
-        .eq('id', bookId);
-      
-      if (error) console.warn('Supabase delete failed:', error);
-      
-      // Update local state
-      setBooks(prev => prev.filter(b => b.id !== bookId));
-      if (active?.id === bookId) {
-        setActive(null);
-        setActiveId(null);
-      }
-      toast.success("Book deleted");
-    } catch (error) {
-      console.error('Error deleting book:', error);
-      toast.error('Failed to delete book');
-    }
-  }
 
-  async function clearAllBooks() {
-    try {
-      // Try to delete all from Supabase
-      const { error } = await supabase
-        .from('books')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
-      
-      if (error) console.warn('Supabase clear failed:', error);
-      
-      setBooks([]);
-      setActive(null);
-      setActiveId(null);
-      toast.success("All books cleared");
-    } catch (error) {
-      console.error('Error clearing books:', error);
-      toast.error('Failed to clear books');
-    }
-  }
 
-  async function illustrateCurrentPage(style: string = "realistic", consistencyMode: boolean = true) {
+  async function illustrateCurrentPage(style: string = "realistic", _consistencyMode: boolean = true) { // eslint-disable-line @typescript-eslint/no-unused-vars
     if (!active || !active.pages[pageIdx]?.prompt) return;
     
     setIsIllustrating(true);
@@ -514,8 +437,11 @@ export default function Home() {
             title: active.title,
             subtitle: active.subtitle,
             city: active.city,
-            childName: active.child.name,
-            pages: active.pages
+            childName: active.child?.name || "Your Child",
+            pages: active.pages.map(page => ({
+              text: page.text,
+              imageUrl: page.imageUrl
+            }))
           }
         }),
       });
@@ -535,6 +461,16 @@ export default function Home() {
       toast.error("Failed to generate share content", { description: e instanceof Error ? e.message : "Unknown error" });
     } finally {
       setIsGeneratingShare(false);
+    }
+  }
+
+  function toggleFullscreen() {
+    if (!isFullscreen) {
+      document.documentElement.requestFullscreen?.();
+      setIsFullscreen(true);
+    } else {
+      document.exitFullscreen?.();
+      setIsFullscreen(false);
     }
   }
 
@@ -583,7 +519,7 @@ export default function Home() {
       
       // Don't overwrite the chunks - they're already being displayed progressively
       // Just set a flag to indicate all features are loaded
-      setAccessibilityContent({ loaded: true });
+      // setAccessibilityContent({ loaded: true }); // Removed - using chunks instead
       toast.success("Accessibility features loaded!");
       
     } catch (e: unknown) {
@@ -753,14 +689,6 @@ export default function Home() {
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [active, pageIdx, isFullscreen]);
 
-  function toggleFullscreen() {
-    if (!isFullscreen) {
-      document.documentElement.requestFullscreen?.();
-    } else {
-      document.exitFullscreen?.();
-    }
-    setIsFullscreen(!isFullscreen);
-  }
 
   if (loading) {
     return (
@@ -778,35 +706,35 @@ export default function Home() {
     return (
       <div className="fixed inset-0 z-50 bg-black">
         {/* Fullscreen Header */}
-        <div className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-black/80 to-transparent p-6">
+        <div className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-black/80 to-transparent p-3 sm:p-6">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setIsFullscreen(false)}
-                className="text-white hover:bg-white/20"
+                className="text-white hover:bg-white/20 p-2 sm:px-3 sm:py-2 flex-shrink-0"
               >
-                <X className="w-5 h-5 mr-2" />
-                Exit
+                <X className="w-4 h-4 sm:w-5 sm:h-5 sm:mr-2" />
+                <span className="hidden sm:inline">Exit</span>
               </Button>
-              <div>
-                <h1 className="text-2xl font-bold text-white">{active.title}</h1>
-                <p className="text-white/70">{active.subtitle}</p>
+              <div className="min-w-0 flex-1">
+                <h1 className="text-lg sm:text-2xl font-bold text-white truncate">{active.title}</h1>
+                <p className="text-white/70 text-sm truncate">{active.subtitle}</p>
               </div>
             </div>
-            <div className="flex items-center gap-4">
-              <div className="text-white/70 text-sm">
+            <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+              <div className="text-white/70 text-xs sm:text-sm hidden sm:block">
                 Page {pageIdx + 1} of {active.pages.length}
               </div>
               <Button
                 variant="ghost"
                 size="sm"
-                    onClick={() => illustrateCurrentPage(illustrationStyle, true)}
-                className="text-white hover:bg-white/20"
+                onClick={() => illustrateCurrentPage(illustrationStyle, true)}
+                className="text-white hover:bg-white/20 p-2 sm:px-3 sm:py-2"
               >
-                <Sparkles className="w-4 h-4 mr-2" />
-                Illustrate
+                <Sparkles className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Illustrate</span>
               </Button>
             </div>
           </div>
@@ -814,7 +742,7 @@ export default function Home() {
 
         {/* Fullscreen Cover Flow */}
         <div 
-          className="h-full flex items-center justify-center pt-20 pb-20"
+          className="h-full flex items-center justify-center pt-16 sm:pt-20 pb-16 sm:pb-20"
           onTouchStart={onTouchStart}
           onTouchMove={onTouchMove}
           onTouchEnd={onTouchEnd}
@@ -831,7 +759,7 @@ export default function Home() {
 
                 if (isFarLeft || isFarRight) return null;
                 
-                const translateX = distance * 100;
+                const translateX = distance * (window.innerWidth < 640 ? 80 : 100);
                 const translateZ = -Math.abs(distance) * 50;
                 const rotateY = distance * 15;
                 const scale = isActive ? 1 : 0.8;
@@ -840,7 +768,7 @@ export default function Home() {
   return (
                   <div
                     key={index}
-                    className="absolute w-full max-w-lg h-4/5 transition-all duration-500 ease-out cursor-pointer"
+                    className="absolute w-full max-w-sm sm:max-w-lg h-3/4 sm:h-4/5 transition-all duration-500 ease-out cursor-pointer"
                     style={{
                       transform: `translateX(${translateX}%) translateZ(${translateZ}px) rotateY(${rotateY}deg) scale(${scale})`,
                       opacity,
@@ -851,13 +779,13 @@ export default function Home() {
                       if (isNext) setPageIdx(Math.min(active.pages.length - 1, pageIdx + 1));
                     }}
                   >
-                    <div className="w-full h-full bg-white rounded-2xl shadow-2xl overflow-hidden">
+                    <div className="w-full h-full bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col">
                         {page.imageUrl && (
-                        <div className="h-1/2">
+                        <div className="h-1/2 flex-shrink-0">
                             <img 
                               src={page.imageUrl} 
                             alt={`Page ${index + 1}`}
-                            className="w-full h-full object-cover"
+                              className="w-full h-full object-cover"
                             onError={(e) => {
                               console.error('Image failed to load:', page.imageUrl);
                               e.currentTarget.style.display = 'none';
@@ -868,23 +796,23 @@ export default function Home() {
                           />
                           </div>
                         )}
-                      <div className="h-1/2 p-6 flex flex-col justify-center">
+                      <div className="h-1/2 p-4 sm:p-6 flex flex-col justify-start overflow-y-auto min-h-0">
                         <div className="text-center">
-                          <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                          <h3 className="text-sm sm:text-lg font-semibold text-gray-800 mb-3">
                             Page {index + 1}
                           </h3>
-                          <p className="text-gray-600 leading-relaxed">
+                          <p className="text-gray-600 leading-relaxed text-sm sm:text-base">
                             {page.text}
                           </p>
                           {page.activity && (
-                            <div className="mt-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-4">
+                            <div className="mt-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-3 sm:p-4">
                               <div className="flex items-center gap-2 mb-2">
-                                <span className="text-amber-600 text-lg">☀️</span>
-                                <h4 className="text-sm font-semibold text-amber-900">
+                                <span className="text-amber-600 text-sm sm:text-lg">☀️</span>
+                                <h4 className="text-xs sm:text-sm font-semibold text-amber-900">
                                   Try This Activity!
                                 </h4>
                                 </div>
-                              <p className="text-xs text-amber-800">
+                              <p className="text-xs sm:text-sm text-amber-800">
                                 {page.activity}
                               </p>
                             </div>
@@ -900,29 +828,58 @@ export default function Home() {
         </div>
 
         {/* Fullscreen Navigation */}
-        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex items-center gap-6">
+        <div className="absolute bottom-4 sm:bottom-8 left-1/2 transform -translate-x-1/2 flex items-center gap-3 sm:gap-6">
           <Button
             variant="ghost"
-            size="lg"
+            size="sm"
             onClick={() => setPageIdx(Math.max(0, pageIdx - 1))}
             disabled={pageIdx === 0}
-            className="text-white hover:bg-white/20 disabled:opacity-30"
+            className="text-white hover:bg-white/20 disabled:opacity-30 px-3 sm:px-6 py-2 sm:py-3"
           >
             ◀ Previous
           </Button>
           
-          <div className="flex items-center gap-2 bg-black/30 backdrop-blur-sm rounded-full px-6 py-3">
-            <span className="text-white text-sm">Use arrow keys or swipe to navigate</span>
+          <div className="hidden sm:flex items-center gap-2 bg-black/30 backdrop-blur-sm rounded-full px-4 sm:px-6 py-2 sm:py-3">
+            <span className="text-white text-xs sm:text-sm">Use arrow keys or swipe to navigate</span>
           </div>
           
           <Button
             variant="ghost"
-            size="lg"
+            size="sm"
             onClick={() => setPageIdx(Math.min(active.pages.length - 1, pageIdx + 1))}
             disabled={pageIdx === active.pages.length - 1}
-            className="text-white hover:bg-white/20 disabled:opacity-30"
+            className="text-white hover:bg-white/20 disabled:opacity-30 px-3 sm:px-6 py-2 sm:py-3"
           >
             Next ▶
+          </Button>
+        </div>
+
+        {/* Bottom Action Buttons */}
+        <div className="absolute bottom-4 right-4 sm:right-8 flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={generateSocialShare}
+            disabled={isGeneratingShare}
+            className="text-white/70 hover:text-white disabled:opacity-50 p-2"
+            title="Share Story"
+          >
+            {isGeneratingShare ? (
+              <div className="w-4 h-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+            ) : (
+              <Share2 className="w-4 h-4" />
+            )}
+          </Button>
+          
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={toggleFullscreen}
+            className="text-white/70 hover:text-white bg-white/10 hover:bg-white/20 p-2 sm:px-3 sm:py-2"
+            title="Exit Fullscreen"
+          >
+            <Maximize className="w-4 h-4 sm:mr-2" />
+            <span className="hidden sm:inline">Exit</span>
           </Button>
         </div>
       </div>
@@ -935,31 +892,23 @@ export default function Home() {
         <div className="h-screen w-full bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col overflow-hidden">
           {/* Header - Only show when no story is active */}
           {!active && (
-            <div className="border-b border-border/50 p-6 w-full">
+            <div className="border-b border-border/50 p-3 sm:p-6 w-full">
               <div className="flex items-center justify-between w-full">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                    <Library className="w-7 h-7 text-white" />
+                <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
+                  <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
+                    <Library className="w-4 h-4 sm:w-7 sm:h-7 text-white" />
                   </div>
-                  <div>
-                    <h1 className="text-3xl font-bold text-white">🚀 StoryVoyage</h1>
-                    <p className="text-white/90">Your colorful adventure library</p>
+                  <div className="min-w-0 flex-1">
+                    <h1 className="text-lg sm:text-3xl font-bold text-white truncate">🚀 StoryVoyage</h1>
+                    <p className="text-white/90 text-xs sm:text-base hidden sm:block">Your colorful adventure library</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-4">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setSidebarOpen(!sidebarOpen)}
-                    className="text-white hover:bg-white/20"
-                  >
-                    <Menu className="w-5 h-5 mr-2" />
-                    {sidebarOpen ? 'Hide Library' : 'Show Library'}
-                  </Button>
-                  <Button asChild size="lg" className="kid-button">
+                <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+                  <Button asChild size="sm" className="kid-button text-xs sm:text-base px-2 sm:px-4 py-2">
                     <Link href="/create">
-                      <Wand2 className="w-5 h-5 mr-2" />
-                      ✨ Create New Story
+                      <Wand2 className="w-4 h-4 sm:w-5 sm:h-5 sm:mr-2" />
+                      <span className="hidden sm:inline">✨ Create New Story</span>
+                      <span className="sm:hidden">✨ Create</span>
                     </Link>
                   </Button>
                 </div>
@@ -969,9 +918,9 @@ export default function Home() {
           
           {/* Header - Only show when story is open */}
           {active && (
-            <div className="border-b border-border/50 p-4">
+            <div className="border-b border-border/50 p-3 sm:p-4">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
                   <Button
                     variant="ghost"
                     size="sm"
@@ -979,369 +928,330 @@ export default function Home() {
                       setActive(null);
                       setActiveId(null);
                     }}
-                    className="text-white hover:bg-white/20"
+                    className="text-white hover:bg-white/20 p-2 sm:px-3 sm:py-2 flex-shrink-0"
                   >
-                    <X className="w-5 h-5 mr-2" />
-                    Back to Library
+                    <X className="w-4 h-4 sm:w-5 sm:h-5 sm:mr-2" />
+                    <span className="hidden sm:inline">Back to Library</span>
                   </Button>
-                  <div>
-                    <h1 className="text-2xl font-bold text-white">{active.title}</h1>
-                    <p className="text-white/70">{active.city}</p>
+                  <div className="min-w-0 flex-1">
+                    <h1 className="text-lg sm:text-2xl font-bold text-white truncate">{active.title}</h1>
+                    <p className="text-white/70 text-sm truncate">{active.city}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-4">
-                  <div className="text-white/70 text-sm">
+                <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+                  <div className="text-white/70 text-xs sm:text-sm">
                     Page {pageIdx + 1} of {active.pages.length}
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={toggleFullscreen}
-                    className="text-white hover:bg-white/20 bg-white/10 hover:bg-white/20"
-                    title="Enter Fullscreen Reading Mode"
-                  >
-                    <Maximize className="w-4 h-4 mr-2" />
-                    Fullscreen
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => window.open(encodeShare(active), '_blank')}
-                    className="text-white hover:bg-white/20"
-                  >
-                    <Share2 className="w-4 h-4" />
-                  </Button>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Content Area with Sidebar */}
-          <div className="flex-1 flex min-h-0">
-            {/* Sidebar - Hidden when story is open */}
-            {!active && sidebarOpen && (
-              <div className="w-80 lg:w-96 xl:w-80 border-r border-border/50 transition-all duration-300 ease-in-out bg-slate-900/50 flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
-                <div className="p-4 flex-1 sidebar-scroll h-fit" >
-                  <div className="space-y-4 pb-6">
-                    {books.length > 0 && (
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <h2 className="text-lg font-semibold text-white">Library</h2>
-                          <Button variant="ghost" size="sm" onClick={clearAllBooks} className="text-white/70 hover:text-destructive">
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                        <div className="space-y-2">
-                          {books.map((book: Book) => (
-                            <Card 
-                              key={book.id} 
-                              className={`cursor-pointer transition-all duration-200 hover:shadow-md bounce-in crayon-border ${
-                                activeId === book.id ? 'ring-1 ring-primary/50 bg-primary/5 coloring-book-page' : 'hover:bg-muted/50 hover:coloring-book-page'
-                              }`}
-                              onClick={() => {
-                                setActive(book);
-                                setActiveId(book.id);
-                                setPageIdx(0); // Reset to first page
-                              }}
-                            >
-                              <CardContent className="p-4">
-                                <div className="space-y-2">
-                                  <h3 className="font-semibold text-base text-white">{book.title}</h3>
-                                  <p className="text-white/80 text-sm line-clamp-2">{book.subtitle}</p>
-                                  <div className="flex items-center gap-3 text-xs text-white/70">
-                                    <span>{book.city}</span>
-                                    <span>•</span>
-                                    <span>{book.pages.length} pages</span>
-                                  </div>
-                                </div>
-                              </CardContent>
-                            </Card>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Main Content Area */}
-            <div className="flex-1 flex flex-col w-full transition-all duration-300 ease-in-out">
+          {/* Main Content Area */}
+          <div className="flex-1 flex flex-col w-full min-h-0 overflow-hidden">
               {/* Content */}
-              <div className="flex-1 p-6 w-full max-w-full overflow-hidden">
+              <div className="flex-1 p-3 sm:p-6 w-full max-w-full overflow-hidden">
             {books.length === 0 ? (
-              <div className="text-center py-20 min-h-[80vh] flex flex-col items-center justify-center w-full">
-                <div className="w-32 h-32 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900/20 dark:to-purple-900/20 flex items-center justify-center mx-auto mb-8 animate-pulse">
-                  <BookOpen className="w-16 h-16 text-primary" />
+              <div className="text-center py-10 sm:py-20 min-h-[60vh] sm:min-h-[80vh] flex flex-col items-center justify-center w-full">
+                <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900/20 dark:to-purple-900/20 flex items-center justify-center mx-auto mb-6 sm:mb-8 animate-pulse">
+                  <BookOpen className="w-12 h-12 sm:w-16 sm:h-16 text-primary" />
                 </div>
-                <h2 className="text-4xl font-bold mb-6 text-white">No Stories Yet</h2>
-                <p className="text-white/80 text-xl mb-8 max-w-2xl mx-auto">
+                <h2 className="text-2xl sm:text-4xl font-bold mb-4 sm:mb-6 text-white">No Stories Yet</h2>
+                <p className="text-white/80 text-base sm:text-xl mb-6 sm:mb-8 max-w-2xl mx-auto px-4">
                   Create your first magical story and watch it come to life with beautiful illustrations.
                 </p>
-                <Button asChild size="lg" className="kid-button text-lg px-8 py-4">
+                <Button asChild size="lg" className="kid-button text-sm sm:text-lg px-6 sm:px-8 py-3 sm:py-4">
                   <Link href="/create">
-                    <Wand2 className="w-6 h-6 mr-3" />
+                    <Wand2 className="w-5 h-5 sm:w-6 sm:h-6 mr-2 sm:mr-3" />
                     ✨ Create Your First Story
                   </Link>
                 </Button>
               </div>
             ) : !active ? (
-              <div className="flex flex-col items-center justify-center min-h-[80vh] text-center p-8 w-full max-w-none">
-                <div className="w-40 h-40 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900/20 dark:to-purple-900/20 flex items-center justify-center mb-8 animate-pulse">
-                  <BookOpen className="w-20 h-20 text-primary" />
+              <div className="w-full">
+                {/* Library Header */}
+                <div className="flex items-center justify-center mb-6">
+                  <h2 className="text-2xl sm:text-3xl font-bold text-white">Your Story Library</h2>
                 </div>
-                <h3 className="text-5xl font-bold mb-6 text-white">Select a Story</h3>
-                <p className="text-white/80 text-2xl max-w-4xl mb-8">
-                  {!sidebarOpen ? 'Click "Show Library" to see your stories, or ' : 'Choose a story from your library to start reading.'}
-                </p>
-                <div className="bg-white/10 backdrop-blur-sm rounded-xl px-8 py-6 border border-white/20 max-w-4xl">
-                  <p className="text-white/90 text-xl">
-                    {!sidebarOpen 
-                      ? '💡 Click "Show Library" in the header to see your stories, then click on any story card to start reading!'
-                      : '💡 Click on any story card in the library to start reading, then use the "Fullscreen" button for an immersive experience!'
-                    }
-                  </p>
+                
+                {/* Story Cards Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 pb-4">
+                  {books.map((book: Book) => (
+                    <Card 
+                      key={book.id} 
+                      className={`cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-105 bounce-in crayon-border ${
+                        activeId === book.id ? 'ring-2 ring-primary/50 bg-primary/5 coloring-book-page' : 'hover:bg-muted/50 coloring-book-page'
+                      }`}
+                      onClick={() => {
+                        setActive(book);
+                        setActiveId(book.id);
+                        setPageIdx(0); // Reset to first page
+                      }}
+                    >
+                      <CardContent className="p-4 sm:p-6">
+                        <div className="space-y-3">
+                          <h3 className="font-bold text-lg sm:text-xl text-white line-clamp-2 leading-tight">{book.title}</h3>
+                          <p className="text-white/80 text-sm sm:text-base line-clamp-3 leading-relaxed">{book.subtitle}</p>
+                          <div className="flex items-center justify-between text-xs sm:text-sm text-white/70">
+                            <span className="flex items-center gap-1">
+                              <span className="w-2 h-2 bg-blue-400 rounded-full"></span>
+                              {book.city}
+                            </span>
+                            <span>{book.pages.length} pages</span>
+                          </div>
+                          <div className="flex items-center justify-between text-xs text-white/60">
+                            <span>Reading Level: {book.readingLevel}</span>
+                            <span>Age {book.child.age}</span>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+                
+                {/* Help Text */}
+                <div className="mt-8 text-center">
+                  <div className="bg-white/10 backdrop-blur-sm rounded-xl px-4 sm:px-8 py-4 sm:py-6 border border-white/20 max-w-2xl mx-auto">
+                    <p className="text-white/90 text-sm sm:text-base">
+                      💡 Click on any story card to start reading, then use the &quot;Fullscreen&quot; button for an immersive experience!
+                    </p>
+                  </div>
                 </div>
               </div>
             ) : (
               <div className="h-full flex flex-col">
-                <Card className="glass card-hover min-h-[600px] flex-1">
-                  <CardContent className="flex-1 p-8">
-                    {/* Cover Flow Story Reader */}
-                    <div 
-                      className="h-full flex items-center justify-center"
-                      onTouchStart={onTouchStart}
-                      onTouchMove={onTouchMove}
-                      onTouchEnd={onTouchEnd}
-                    >
-                      <div className="relative w-full max-w-4xl h-full perspective-1000">
-                        <div className="relative w-full h-full flex items-center justify-center">
-                          {active.pages.map((page, index) => {
-                            const distance = index - pageIdx;
-                            const isActive = distance === 0;
-                            const isVisible = Math.abs(distance) <= 2;
+                {/* Cover Flow Story Reader - Floating Cards */}
+                <div 
+                  className="flex-1 flex items-center justify-center overflow-hidden"
+                  onTouchStart={onTouchStart}
+                  onTouchMove={onTouchMove}
+                  onTouchEnd={onTouchEnd}
+                >
+                  <div className="relative w-full max-w-4xl h-full perspective-1000">
+                    <div className="relative w-full h-full flex items-center justify-center">
+                      {active.pages.map((page, index) => {
+                        const distance = index - pageIdx;
+                        const isActive = distance === 0;
+                        const isVisible = Math.abs(distance) <= 2;
+                        
+                        if (!isVisible) return null;
+                        
+                        return (
+                          <div
+                            key={index}
+                            className={`absolute transition-all duration-700 ease-out transform-gpu ${
+                              isActive 
+                                ? 'z-30 scale-100 opacity-100' 
+                                : distance < 0 
+                              ? `z-20 scale-75 opacity-60 -translate-x-20 sm:-translate-x-40 rotate-y-15`
+                              : `z-20 scale-75 opacity-60 translate-x-20 sm:translate-x-40 -rotate-y-15`
+                            }`}
+                            style={{
+                              transform: `translateX(${distance * (window.innerWidth < 640 ? 200 : 350)}px) rotateY(${distance * 15}deg) scale(${isActive ? 1 : 0.75})`,
+                              transformStyle: 'preserve-3d',
+                              backfaceVisibility: 'hidden'
+                            }}
+                          >
+                {/* Floating Page Card */}
+                <div className="relative w-full max-w-sm sm:w-[500px] sm:h-[700px] bg-white rounded-2xl shadow-2xl overflow-hidden">
                             
-                            if (!isVisible) return null;
-                            
-                            return (
-                              <div
-                                key={index}
-                                className={`absolute transition-all duration-700 ease-out transform-gpu ${
-                                  isActive 
-                                    ? 'z-30 scale-100 opacity-100' 
-                                    : distance < 0 
-                                  ? `z-20 scale-75 opacity-60 -translate-x-40 rotate-y-15`
-                                  : `z-20 scale-75 opacity-60 translate-x-40 -rotate-y-15`
-                                }`}
-                                style={{
-                                  transform: `translateX(${distance * 350}px) rotateY(${distance * 15}deg) scale(${isActive ? 1 : 0.75})`,
-                                  transformStyle: 'preserve-3d',
-                                  backfaceVisibility: 'hidden'
-                                }}
-                              >
-                    {/* Page Card */}
-                    <div className="relative w-[500px] h-[700px] coloring-book-page overflow-hidden">
-                                  
-                                  {/* Page Content */}
-                                  <div className="h-full flex flex-col">
-                                    {/* Image Section */}
-                                    {page.imageUrl && (
-                                      <div className="relative h-96 overflow-hidden">
-                                        <img 
-                                          src={page.imageUrl} 
-                                          alt="Illustration" 
-                                          className="w-full h-full object-contain bg-slate-100 dark:bg-slate-700"
-                                          onError={(e) => {
-                                            console.error('Image failed to load:', page.imageUrl);
-                                            e.currentTarget.style.display = 'none';
-                                          }}
-                                          onLoad={() => {
-                                            console.log('Image loaded successfully:', page.imageUrl);
-                                          }}
-                                        />
-                                        <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
-                                      </div>
-                                    )}
-                                    
-                                    {/* Text Section */}
-                                    <div className="flex-1 p-6 flex flex-col justify-center">
-                                      <div className="prose prose-sm max-w-none text-center">
-                                        <p className="text-sm leading-relaxed text-gray-900 font-medium whitespace-pre-wrap line-clamp-8 bg-white/90 p-4 rounded-lg shadow-md">
-                                          {page.text}
-                                        </p>
-                                      </div>
-                                      
-                                      {/* Activity */}
-                                      {page.activity && (
-                                        <div className="mt-4 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
-                                          <div className="flex items-start gap-3">
-                                            <div className="w-6 h-6 rounded-full bg-amber-500 flex items-center justify-center flex-shrink-0 mt-1">
-                                              <Sparkles className="w-3 h-3 text-white" />
-                                            </div>
-                                            <div>
-                                              <h4 className="font-semibold text-amber-900 dark:text-amber-100 text-xs mb-1">Try This!</h4>
-                                              <p className="text-amber-800 dark:text-amber-200 text-xs">{page.activity}</p>
-                                            </div>
-                                          </div>
-                                        </div>
-                                      )}
-                                    </div>
-                                    
-                                    {/* Page Reflection Effect */}
-                                    <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-white/30 to-transparent dark:from-slate-800/30 pointer-events-none" />
-                                  </div>
+                            {/* Page Content */}
+                            <div className="h-full flex flex-col">
+                              {/* Image Section */}
+                              {page.imageUrl && (
+                                <div className="relative h-64 sm:h-96 overflow-hidden flex-shrink-0">
+                                  <img 
+                                    src={page.imageUrl} 
+                                    alt="Illustration" 
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      console.error('Image failed to load:', page.imageUrl);
+                                      e.currentTarget.style.display = 'none';
+                                    }}
+                                    onLoad={() => {
+                                      console.log('Image loaded successfully:', page.imageUrl);
+                                    }}
+                                  />
+                                  <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
                                 </div>
+                              )}
+                              
+                              {/* Text Section - Scrollable on Mobile */}
+                              <div className="flex-1 p-4 sm:p-6 flex flex-col justify-start overflow-y-auto min-h-0">
+                                <div className="prose prose-sm max-w-none text-center">
+                                  <p className="text-sm sm:text-base leading-relaxed text-gray-900 font-medium whitespace-pre-wrap">
+                                    {page.text}
+                                  </p>
+                                </div>
+                                
+                                {/* Activity */}
+                                {page.activity && (
+                                  <div className="mt-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-lg p-3 sm:p-4">
+                                    <div className="flex items-start gap-3">
+                                      <div className="w-6 h-6 rounded-full bg-amber-500 flex items-center justify-center flex-shrink-0 mt-1">
+                                        <Sparkles className="w-3 h-3 text-white" />
+                                      </div>
+                                      <div>
+                                        <h4 className="font-semibold text-amber-900 text-sm mb-2">Try This!</h4>
+                                        <p className="text-amber-800 text-sm">{page.activity}</p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
                               </div>
-                            );
-                          })}
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
 
                 {/* Navigation */}
-                <div className="flex items-center justify-between mt-6">
+                <div className="flex flex-col sm:flex-row items-center justify-between mt-4 sm:mt-6 gap-4">
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => setPageIdx(Math.max(0, pageIdx - 1))}
                     disabled={pageIdx === 0}
-                    className="text-white/70 hover:text-white disabled:opacity-30"
+                    className="text-white/70 hover:text-white disabled:opacity-30 px-4 py-2"
                   >
                     ◀ Previous
                   </Button>
                   
-                  <div className="flex items-center gap-4">
-                    <div className="text-white/70 text-sm font-medium">
+                  <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4 w-full sm:w-auto">
+                    <div className="text-white/70 text-sm font-medium order-1 sm:order-none">
                       {pageIdx + 1} / {active.pages.length}
                     </div>
                     
-                    {/* Advanced Illustration Controls */}
-                    <div className="flex items-center gap-2">
-                      <select
-                        value={illustrationStyle}
-                        onChange={(e) => setIllustrationStyle(e.target.value)}
-                        className="bg-white text-gray-900 text-xs px-2 py-1 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="realistic" className="text-gray-900">Realistic</option>
-                        <option value="cartoon" className="text-gray-900">Cartoon</option>
-                        <option value="watercolor" className="text-gray-900">Watercolor</option>
-                        <option value="sketch" className="text-gray-900">Sketch</option>
-                      </select>
+                    {/* Mobile Controls - Collapsible */}
+                    <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-4 order-2 sm:order-none">
+                      {/* Advanced Illustration Controls */}
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={illustrationStyle}
+                          onChange={(e) => setIllustrationStyle(e.target.value)}
+                          className="bg-white text-gray-900 text-xs px-2 py-1 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="realistic" className="text-gray-900">Realistic</option>
+                          <option value="cartoon" className="text-gray-900">Cartoon</option>
+                          <option value="watercolor" className="text-gray-900">Watercolor</option>
+                          <option value="sketch" className="text-gray-900">Sketch</option>
+                        </select>
+                        
+                        <label className="hidden sm:flex items-center gap-1 text-xs text-white">
+                          <input
+                            type="checkbox"
+                            checked={consistencyMode}
+                            disabled={true}
+                            className="w-3 h-3 opacity-50"
+                          />
+                          Consistency
+                        </label>
+                      </div>
                       
-                      <label className="flex items-center gap-1 text-xs text-white">
-                        <input
-                          type="checkbox"
-                          checked={consistencyMode}
-                          disabled={true}
-                          className="w-3 h-3 opacity-50"
-                        />
-                        Consistency (Always On)
-                      </label>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => illustrateCurrentPage(illustrationStyle, true)}
+                        disabled={isIllustrating}
+                        className="text-white/70 hover:text-white disabled:opacity-50 p-2"
+                        title="Generate Advanced Illustration"
+                      >
+                        {isIllustrating ? (
+                          <div className="w-4 h-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                        ) : (
+                          <Sparkles className="w-4 h-4" />
+                        )}
+                      </Button>
+                      
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={loadEducationalFeatures}
+                        disabled={isLoadingEducational}
+                        className="text-white/70 hover:text-white disabled:opacity-50 p-2"
+                        title="Load Educational Features"
+                      >
+                        {isLoadingEducational ? (
+                          <div className="w-4 h-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                        ) : (
+                          "📚"
+                        )}
+                      </Button>
+                      
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={loadAccessibilityFeatures}
+                        disabled={isLoadingAccessibility}
+                        className="text-white/70 hover:text-white disabled:opacity-50 p-2"
+                        title="Accessibility Features"
+                      >
+                        {isLoadingAccessibility ? (
+                          <div className="w-4 h-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                        ) : (
+                          "♿"
+                        )}
+                      </Button>
+                      
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={loadReadabilityFeatures}
+                        disabled={isLoadingReadability}
+                        className="text-white/70 hover:text-white disabled:opacity-50 p-2"
+                        title="Readability Enhancements"
+                      >
+                        {isLoadingReadability ? (
+                          <div className="w-4 h-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                        ) : (
+                          "📖"
+                        )}
+                      </Button>
+                      
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={batchIllustrateAllPages}
+                        disabled={isBatchIllustrating}
+                        className="text-white/70 hover:text-white disabled:opacity-50 p-2"
+                        title="Batch Illustrate All Pages"
+                      >
+                        {isBatchIllustrating ? (
+                          <div className="w-4 h-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                        ) : (
+                          "🎨"
+                        )}
+                      </Button>
+                      
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={generateSocialShare}
+                        disabled={isGeneratingShare}
+                        className="text-white/70 hover:text-white disabled:opacity-50 p-2"
+                        title="Share Story"
+                      >
+                        {isGeneratingShare ? (
+                          <div className="w-4 h-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                        ) : (
+                          <Share2 className="w-4 h-4" />
+                        )}
+                      </Button>
+                      
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={toggleFullscreen}
+                        className="text-white/70 hover:text-white disabled:opacity-50 p-2"
+                        title="Enter Fullscreen"
+                      >
+                        <Maximize className="w-4 h-4" />
+                      </Button>
+                      
                     </div>
-                    
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => illustrateCurrentPage(illustrationStyle, true)}
-                      disabled={isIllustrating}
-                      className="text-white/70 hover:text-white disabled:opacity-50"
-                      title="Generate Advanced Illustration"
-                    >
-                      {isIllustrating ? (
-                        <div className="w-4 h-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                      ) : (
-                        <Sparkles className="w-4 h-4" />
-                      )}
-                    </Button>
-                    
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={loadEducationalFeatures}
-                      disabled={isLoadingEducational}
-                      className="text-white/70 hover:text-white disabled:opacity-50"
-                      title="Load Educational Features"
-                    >
-                      {isLoadingEducational ? (
-                        <div className="w-4 h-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                      ) : (
-                        "📚"
-                      )}
-                    </Button>
-                    
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={loadAccessibilityFeatures}
-                      disabled={isLoadingAccessibility}
-                      className="text-white/70 hover:text-white disabled:opacity-50"
-                      title="Accessibility Features"
-                    >
-                      {isLoadingAccessibility ? (
-                        <div className="w-4 h-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                      ) : (
-                        "♿"
-                      )}
-                    </Button>
-                    
-                    
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={loadReadabilityFeatures}
-                      disabled={isLoadingReadability}
-                      className="text-white/70 hover:text-white disabled:opacity-50"
-                      title="Readability Enhancements"
-                    >
-                      {isLoadingReadability ? (
-                        <div className="w-4 h-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                      ) : (
-                        "📖"
-                      )}
-                    </Button>
-                    
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={batchIllustrateAllPages}
-                      disabled={isBatchIllustrating}
-                      className="text-white/70 hover:text-white disabled:opacity-50"
-                      title="Batch Illustrate All Pages"
-                    >
-                      {isBatchIllustrating ? (
-                        <div className="w-4 h-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                      ) : (
-                        "🎨"
-                      )}
-                    </Button>
-                    
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={generateSocialShare}
-                      disabled={isGeneratingShare}
-                      className="text-white/70 hover:text-white disabled:opacity-50"
-                      title="Share Story"
-                    >
-                      {isGeneratingShare ? (
-                        <div className="w-4 h-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                      ) : (
-                        <Share2 className="w-4 h-4" />
-                      )}
-                    </Button>
-                    
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={toggleFullscreen}
-                      className="text-white/70 hover:text-white bg-white/10 hover:bg-white/20"
-                      title="Enter Fullscreen Reading Mode"
-                    >
-                      <Maximize className="w-4 h-4 mr-2" />
-                      Fullscreen
-                    </Button>
                   </div>
                   
                   <Button
@@ -1349,28 +1259,26 @@ export default function Home() {
                     size="sm"
                     onClick={() => setPageIdx(Math.min(active.pages.length - 1, pageIdx + 1))}
                     disabled={pageIdx === active.pages.length - 1}
-                    className="text-white/70 hover:text-white disabled:opacity-30"
+                    className="text-white/70 hover:text-white disabled:opacity-30 px-4 py-2"
                   >
                     Next ▶
                   </Button>
                 </div>
               </div>
-        )}
-              </div>
-            </div>
+            )}
           </div>
         </div>
         
         {/* Educational Features Panel */}
         {showEducationalFeatures && (
-          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-xl max-w-4xl max-h-[80vh] overflow-y-auto p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">Educational Features</h2>
+          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-2 sm:p-4">
+            <div className="bg-white rounded-xl max-w-4xl max-h-[90vh] sm:max-h-[80vh] overflow-y-auto p-4 sm:p-6 w-full">
+              <div className="flex items-center justify-between mb-4 sm:mb-6">
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Educational Features</h2>
                 <Button
                   variant="ghost"
                   onClick={() => setShowEducationalFeatures(false)}
-                  className="text-gray-500 hover:text-gray-700"
+                  className="text-gray-500 hover:text-gray-700 p-2"
                 >
                   <X className="w-5 h-5" />
                 </Button>
@@ -1413,7 +1321,7 @@ export default function Home() {
                     </div>
                   ) : educationalChunks.comprehension_quiz ? (
                     <div className="space-y-3">
-                      {educationalChunks.comprehension_quiz?.questions?.map((q: any, idx: number) => (
+                      {educationalChunks.comprehension_quiz?.questions?.map((q: any, idx: number) => ( // eslint-disable-line @typescript-eslint/no-explicit-any
                         <div key={idx} className="bg-white rounded p-3 border border-gray-200">
                           <p className="font-medium text-gray-900 mb-2">{q.question}</p>
                           <div className="space-y-1">
@@ -1443,7 +1351,7 @@ export default function Home() {
                     </div>
                   ) : educationalChunks.vocabulary_builder ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {educationalChunks.vocabulary_builder?.vocabulary?.map((word: any, idx: number) => (
+                      {educationalChunks.vocabulary_builder?.vocabulary?.map((word: any, idx: number) => ( // eslint-disable-line @typescript-eslint/no-explicit-any
                         <div key={idx} className="bg-white rounded p-3 border border-gray-200">
                           <h4 className="font-semibold text-green-800">{word.word}</h4>
                           <p className="text-sm text-gray-900 font-medium mb-1">{word.definition}</p>
@@ -1467,7 +1375,7 @@ export default function Home() {
                     </div>
                   ) : educationalChunks.cultural_facts ? (
                     <div className="space-y-2">
-                      {educationalChunks.cultural_facts?.culturalFacts?.map((fact: any, idx: number) => (
+                      {educationalChunks.cultural_facts?.culturalFacts?.map((fact: any, idx: number) => ( // eslint-disable-line @typescript-eslint/no-explicit-any
                         <div key={idx} className="bg-white rounded p-3 border border-gray-200">
                           <p className="text-gray-900 mb-1 font-medium">{fact.fact}</p>
                           <div className="flex items-center gap-2 text-xs text-gray-800">
@@ -1492,7 +1400,7 @@ export default function Home() {
                     </div>
                   ) : educationalChunks.activity_suggestions ? (
                     <div className="space-y-3">
-                      {educationalChunks.activity_suggestions?.activities?.map((activity: any, idx: number) => (
+                      {educationalChunks.activity_suggestions?.activities?.map((activity: any, idx: number) => ( // eslint-disable-line @typescript-eslint/no-explicit-any
                         <div key={idx} className="bg-white rounded p-3">
                           <h4 className="font-semibold text-orange-800 mb-1">{activity.title}</h4>
                           <p className="text-sm text-gray-700 mb-2">{activity.description}</p>
@@ -1514,14 +1422,14 @@ export default function Home() {
         
         {/* Accessibility Features Panel */}
         {showAccessibilityFeatures && (
-          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-xl max-w-4xl max-h-[80vh] overflow-y-auto p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">Accessibility Features</h2>
+          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-2 sm:p-4">
+            <div className="bg-white rounded-xl max-w-4xl max-h-[90vh] sm:max-h-[80vh] overflow-y-auto p-4 sm:p-6 w-full">
+              <div className="flex items-center justify-between mb-4 sm:mb-6">
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Accessibility Features</h2>
                 <Button
                   variant="ghost"
                   onClick={() => setShowAccessibilityFeatures(false)}
-                  className="text-gray-500 hover:text-gray-700"
+                  className="text-gray-500 hover:text-gray-700 p-2"
                 >
                   <X className="w-5 h-5" />
                 </Button>
@@ -1738,14 +1646,14 @@ export default function Home() {
         
         {/* Readability Features Panel */}
         {showReadabilityFeatures && (
-          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-xl max-w-5xl max-h-[80vh] overflow-y-auto p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">Readability Enhancements</h2>
+          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-2 sm:p-4">
+            <div className="bg-white rounded-xl max-w-5xl max-h-[90vh] sm:max-h-[80vh] overflow-y-auto p-4 sm:p-6 w-full">
+              <div className="flex items-center justify-between mb-4 sm:mb-6">
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Readability Enhancements</h2>
                 <Button
                   variant="ghost"
                   onClick={() => setShowReadabilityFeatures(false)}
-                  className="text-gray-500 hover:text-gray-700"
+                  className="text-gray-500 hover:text-gray-700 p-2"
                 >
                   <X className="w-5 h-5" />
                 </Button>
@@ -1852,7 +1760,7 @@ export default function Home() {
                     </div>
                   ) : readabilityChunks.vocabulary_highlighting ? (
                     <div className="space-y-3">
-                      {readabilityChunks.vocabulary_highlighting?.challengingWords?.map((word: any, idx: number) => (
+                      {readabilityChunks.vocabulary_highlighting?.challengingWords?.map((word: any, idx: number) => ( // eslint-disable-line @typescript-eslint/no-explicit-any
                         <div key={idx} className="bg-white rounded p-3 border border-gray-200">
                           <div className="flex items-center justify-between mb-2">
                             <h4 className="font-semibold text-purple-800">{word.word}</h4>
@@ -1892,7 +1800,7 @@ export default function Home() {
                       <div className="bg-white rounded p-3 border border-gray-200">
                         <h4 className="font-medium text-orange-800 mb-2">Pause Points</h4>
                         <div className="space-y-2">
-                          {readabilityChunks.reading_pace_guide?.paceGuide?.pausePoints?.map((pause: any, idx: number) => (
+                          {readabilityChunks.reading_pace_guide?.paceGuide?.pausePoints?.map((pause: any, idx: number) => ( // eslint-disable-line @typescript-eslint/no-explicit-any
                             <div key={idx} className="text-xs text-gray-900 font-medium">
                               <strong>{pause.location}:</strong> {pause.reason} ({pause.duration})
                             </div>
@@ -1918,7 +1826,7 @@ export default function Home() {
                       <div className="bg-white rounded p-3 border border-gray-200">
                         <h4 className="font-medium text-pink-800 mb-2">Question Prompts</h4>
                         <div className="space-y-2">
-                          {readabilityChunks.comprehension_aids?.questionPrompts?.map((prompt: any, idx: number) => (
+                          {readabilityChunks.comprehension_aids?.questionPrompts?.map((prompt: any, idx: number) => ( // eslint-disable-line @typescript-eslint/no-explicit-any
                             <div key={idx} className="text-sm">
                               <strong className="text-pink-700">{prompt.type}:</strong>
                               <ul className="ml-4 mt-1 space-y-1">
@@ -2026,6 +1934,7 @@ export default function Home() {
             </div>
           </div>
         )}
+        </div>
       </SidebarProvider>
     </div>
   );

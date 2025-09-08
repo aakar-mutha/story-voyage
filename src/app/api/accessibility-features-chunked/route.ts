@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid body", details: parsed.error.flatten() }, { status: 400 });
     }
     
-    const { bookId, pageText, imageUrl, readingLevel, childAge, feature } = parsed.data;
+    const { bookId: _bookId, pageText, imageUrl, readingLevel, childAge, feature } = parsed.data; // eslint-disable-line @typescript-eslint/no-unused-vars
     const ai = new GoogleGenAI({ apiKey });
 
     let result: Record<string, unknown> = {};

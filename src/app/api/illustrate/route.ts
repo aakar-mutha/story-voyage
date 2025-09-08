@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
-import { writeFile, mkdir } from "fs/promises";
-import { join } from "path";
 import { uploadImageToStorage } from "@/lib/supabase";
 
 const BodySchema = z.object({

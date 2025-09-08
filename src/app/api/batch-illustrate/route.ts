@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
-import { writeFile, mkdir } from "fs/promises";
-import { join } from "path";
 import { uploadImageToStorage } from "@/lib/supabase";
 
 const BodySchema = z.object({
@@ -112,7 +110,7 @@ async function generatePageIllustration(
   style: string,
   consistencyMode: boolean,
   fusionMode: boolean,
-  _allPages: { text: string; prompt: string; pageIndex: number }[]
+  _allPages: { text: string; prompt: string; pageIndex: number }[] // eslint-disable-line @typescript-eslint/no-unused-vars
 ): Promise<{ success: boolean; pageIndex: number; imageUrl?: string; error?: string; prompt?: string; text?: string; features?: Record<string, string> }> {
   try {
     // Build enhanced prompt for this specific page
