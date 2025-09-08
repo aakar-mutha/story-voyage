@@ -11,6 +11,7 @@ import { supabase, Book } from "@/lib/supabase";
 
 // Content type interfaces
 interface EducationalContent {
+  loaded?: boolean;
   comprehensionQuiz?: {
     questions?: Array<{
       question: string;
@@ -45,6 +46,7 @@ interface EducationalContent {
 }
 
 interface AccessibilityContent {
+  loaded?: boolean;
   altText?: {
     altText: string;
     simpleAltText: string;
@@ -76,35 +78,9 @@ interface AccessibilityContent {
   };
 }
 
-interface PresentationContent {
-  animations?: {
-    animations?: Array<{
-      element: string;
-      type: string;
-      description: string;
-      duration: string;
-      trigger: string;
-    }>;
-  };
-  interactiveElements?: {
-    clickableElements?: Array<{
-      element: string;
-      action: string;
-      feedback: string;
-      sound: string;
-    }>;
-  };
-  soundEffects?: {
-    ambientSounds?: Array<{
-      sound: string;
-      description: string;
-      volume: string;
-      loop: boolean;
-    }>;
-  };
-}
 
 interface ReadabilityContent {
+  loaded?: boolean;
   textSimplification?: {
     simplifiedVersions?: {
       verySimple: string;
@@ -186,6 +162,94 @@ function encodeShare(book: Book) {
   return `/read?id=${book.id}`;
 }
 
+function renderColorCodedText(text: string, colorCoding: Record<string, string>) {
+  // Enhanced word classification for better color coding
+  const words = text.split(/(\s+)/);
+  
+  // Default colors with good contrast
+  const defaultColors = {
+    nouns: '#FF6B6B',      // Red
+    verbs: '#4ECDC4',      // Teal
+    adjectives: '#9B59B6', // Purple
+    important: '#FFA07A'   // Orange
+  };
+  
+  // Common words that shouldn't be colored
+  const commonWords = new Set([
+    'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by',
+    'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did',
+    'will', 'would', 'could', 'should', 'may', 'might', 'can', 'must', 'shall', 'this', 'that',
+    'these', 'those', 'i', 'you', 'he', 'she', 'it', 'we', 'they', 'me', 'him', 'her', 'us', 'them',
+    'my', 'your', 'his', 'her', 'its', 'our', 'their', 'mine', 'yours', 'hers', 'ours', 'theirs'
+  ]);
+  
+  // Adjective patterns
+  const adjectivePatterns = [
+    /^[a-z]+(?:ful|less|ous|ive|able|ible|al|ic|ical|ish|like|some)$/i,
+    /^[a-z]+(?:er|est)$/i
+  ];
+  
+  // Verb patterns
+  const verbPatterns = [
+    /^[a-z]+(?:ing|ed|en)$/i,
+    /^[a-z]+(?:s|es)$/i
+  ];
+  
+  return words.map((word, index) => {
+    const cleanWord = word.toLowerCase().replace(/[^\w]/g, '');
+    
+    // Skip empty words or common words
+    if (!cleanWord || commonWords.has(cleanWord)) {
+      return <span key={index}>{word}</span>;
+    }
+    
+    let wordType = '';
+    let color = '#000000'; // Default to black for visibility
+    
+    // Check for adjectives
+    if (adjectivePatterns.some(pattern => pattern.test(cleanWord)) || 
+        ['big', 'small', 'red', 'blue', 'green', 'yellow', 'happy', 'sad', 'beautiful', 'ugly', 
+         'fast', 'slow', 'hot', 'cold', 'new', 'old', 'good', 'bad', 'great', 'amazing'].includes(cleanWord)) {
+      wordType = 'adjectives';
+    }
+    // Check for verbs
+    else if (verbPatterns.some(pattern => pattern.test(cleanWord)) ||
+             ['run', 'walk', 'jump', 'play', 'eat', 'drink', 'see', 'hear', 'smell', 'touch',
+              'think', 'know', 'understand', 'learn', 'teach', 'help', 'make', 'create', 'build'].includes(cleanWord)) {
+      wordType = 'verbs';
+    }
+    // Check for nouns (longer words that aren't verbs or adjectives)
+    else if (cleanWord.length > 3 && !verbPatterns.some(pattern => pattern.test(cleanWord))) {
+      wordType = 'nouns';
+    }
+    
+    // Apply color with fallback to ensure visibility
+    if (wordType) {
+      // Use the color from colorCoding if available, otherwise use default
+      color = colorCoding[wordType] || defaultColors[wordType as keyof typeof defaultColors] || '#000000';
+      
+      // Ensure the color is not white or too light
+      if (color === '#ffffff' || color === '#fff' || color === 'white' || 
+          (color.startsWith('#') && parseInt(color.slice(1), 16) > 0xF0F0F0)) {
+        color = defaultColors[wordType as keyof typeof defaultColors] || '#000000';
+      }
+    }
+    
+    return (
+      <span 
+        key={index} 
+        style={{ 
+          color,
+          fontWeight: wordType ? '600' : 'normal'
+        }}
+        title={wordType ? `${wordType}: ${word}` : word}
+      >
+        {word}
+      </span>
+    );
+  });
+}
+
 export default function Home() {
   const [books, setBooks] = useState<Book[]>([]);
   const [active, setActive] = useState<Book | null>(null);
@@ -202,17 +266,20 @@ export default function Home() {
   const [educationalContent, setEducationalContent] = useState<EducationalContent | null>(null);
   const [showAccessibilityFeatures, setShowAccessibilityFeatures] = useState(false);
   const [accessibilityContent, setAccessibilityContent] = useState<AccessibilityContent | null>(null);
-  const [showPresentationFeatures, setShowPresentationFeatures] = useState(false);
-  const [presentationContent, setPresentationContent] = useState<PresentationContent | null>(null);
   const [isBatchIllustrating, setIsBatchIllustrating] = useState(false);
   const [showReadabilityFeatures, setShowReadabilityFeatures] = useState(false);
   const [readabilityContent, setReadabilityContent] = useState<ReadabilityContent | null>(null);
   const [isIllustrating, setIsIllustrating] = useState(false);
   const [isLoadingEducational, setIsLoadingEducational] = useState(false);
+  const [educationalProgress, setEducationalProgress] = useState<{ [key: string]: boolean }>({});
+  const [educationalChunks, setEducationalChunks] = useState<{ [key: string]: any }>({});
   const [isLoadingAccessibility, setIsLoadingAccessibility] = useState(false);
-  const [isLoadingPresentation, setIsLoadingPresentation] = useState(false);
+  const [accessibilityProgress, setAccessibilityProgress] = useState<{ [key: string]: boolean }>({});
+  const [accessibilityChunks, setAccessibilityChunks] = useState<{ [key: string]: any }>({});
   const [isGeneratingShare, setIsGeneratingShare] = useState(false);
   const [isLoadingReadability, setIsLoadingReadability] = useState(false);
+  const [readabilityProgress, setReadabilityProgress] = useState<{ [key: string]: boolean }>({});
+  const [readabilityChunks, setReadabilityChunks] = useState<{ [key: string]: any }>({});
 
   // Load books from Supabase
   useEffect(() => {
@@ -381,25 +448,50 @@ export default function Home() {
     if (!active || !active.pages[pageIdx]) return;
     
     setIsLoadingEducational(true);
+    setEducationalProgress({});
+    setEducationalChunks({});
+    setShowEducationalFeatures(true);
+    
+    const features = ["comprehension_quiz", "vocabulary_builder", "cultural_facts", "activity_suggestions"];
+    
     try {
-      const res = await fetch('/api/educational-features', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          bookId: active.id,
-          pageText: active.pages[pageIdx].text,
-          readingLevel: active.readingLevel,
-          childAge: active.child.age,
-          city: active.city,
-          features: ["comprehension_quiz", "vocabulary_builder", "cultural_facts", "activity_suggestions"]
-        }),
+      // Load features in parallel for speed
+      const promises = features.map(async (feature) => {
+        setEducationalProgress(prev => ({ ...prev, [feature]: true }));
+        
+        try {
+          const res = await fetch('/api/educational-features-chunked', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              bookId: active.id,
+              pageText: active.pages[pageIdx].text,
+              readingLevel: active.readingLevel,
+              childAge: active.child.age,
+              city: active.city,
+              feature
+            }),
+          });
+          
+          const data = await res.json();
+          if (!res.ok) throw new Error(data?.error || `Failed to load ${feature}`);
+          
+          setEducationalChunks(prev => ({ ...prev, [feature]: data.data }));
+          setEducationalProgress(prev => ({ ...prev, [feature]: false }));
+          
+        } catch (error) {
+          console.error(`Error loading ${feature}:`, error);
+          setEducationalProgress(prev => ({ ...prev, [feature]: false }));
+        }
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Failed to load educational features");
       
-      setEducationalContent(data.educationalContent);
-      setShowEducationalFeatures(true);
-      toast.success("Educational features loaded");
+      await Promise.all(promises);
+      
+      // Don't overwrite the chunks - they're already being displayed progressively
+      // Just set a flag to indicate all features are loaded
+      setEducationalContent({ loaded: true });
+      toast.success("Educational features loaded!");
+      
     } catch (e: unknown) {
       toast.error("Failed to load educational features", { description: e instanceof Error ? e.message : "Unknown error" });
     } finally {
@@ -450,25 +542,50 @@ export default function Home() {
     if (!active || !active.pages[pageIdx]) return;
     
     setIsLoadingAccessibility(true);
+    setAccessibilityProgress({});
+    setAccessibilityChunks({});
+    setShowAccessibilityFeatures(true);
+    
+    const features = ["alt_text_generation", "simplified_text", "dyslexia_friendly", "audio_description"];
+    
     try {
-      const res = await fetch('/api/accessibility-features', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          bookId: active.id,
-          pageText: active.pages[pageIdx].text,
-          imageUrl: active.pages[pageIdx].imageUrl,
-          readingLevel: active.readingLevel,
-          childAge: active.child.age,
-          features: ["alt_text_generation", "simplified_text", "dyslexia_friendly", "audio_description"]
-        }),
+      // Load features in parallel for speed
+      const promises = features.map(async (feature) => {
+        setAccessibilityProgress(prev => ({ ...prev, [feature]: true }));
+        
+        try {
+          const res = await fetch('/api/accessibility-features-chunked', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              bookId: active.id,
+              pageText: active.pages[pageIdx].text,
+              imageUrl: active.pages[pageIdx].imageUrl,
+              readingLevel: active.readingLevel,
+              childAge: active.child.age,
+              feature
+            }),
+          });
+          
+          const data = await res.json();
+          if (!res.ok) throw new Error(data?.error || `Failed to load ${feature}`);
+          
+          setAccessibilityChunks(prev => ({ ...prev, [feature]: data.data }));
+          setAccessibilityProgress(prev => ({ ...prev, [feature]: false }));
+          
+        } catch (error) {
+          console.error(`Error loading ${feature}:`, error);
+          setAccessibilityProgress(prev => ({ ...prev, [feature]: false }));
+        }
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Failed to load accessibility features");
       
-      setAccessibilityContent(data.accessibilityContent);
-      setShowAccessibilityFeatures(true);
-      toast.success("Accessibility features loaded");
+      await Promise.all(promises);
+      
+      // Don't overwrite the chunks - they're already being displayed progressively
+      // Just set a flag to indicate all features are loaded
+      setAccessibilityContent({ loaded: true });
+      toast.success("Accessibility features loaded!");
+      
     } catch (e: unknown) {
       toast.error("Failed to load accessibility features", { description: e instanceof Error ? e.message : "Unknown error" });
     } finally {
@@ -476,35 +593,6 @@ export default function Home() {
     }
   }
 
-  async function loadPresentationFeatures() {
-    if (!active || !active.pages[pageIdx]) return;
-    
-    setIsLoadingPresentation(true);
-    try {
-      const res = await fetch('/api/presentation-enhancements', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          bookId: active.id,
-          pageText: active.pages[pageIdx].text,
-          imageUrl: active.pages[pageIdx].imageUrl,
-          readingLevel: active.readingLevel,
-          childAge: active.child.age,
-          enhancements: ["animation_effects", "interactive_elements", "sound_effects", "storytelling_improvements"]
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Failed to load presentation features");
-      
-      setPresentationContent(data.presentationContent);
-      setShowPresentationFeatures(true);
-      toast.success("Presentation features loaded");
-    } catch (e: unknown) {
-      toast.error("Failed to load presentation features", { description: e instanceof Error ? e.message : "Unknown error" });
-    } finally {
-      setIsLoadingPresentation(false);
-    }
-  }
 
   async function batchIllustrateAllPages() {
     if (!active) return;
@@ -563,24 +651,56 @@ export default function Home() {
     if (!active || !active.pages[pageIdx]) return;
     
     setIsLoadingReadability(true);
+    setReadabilityProgress({});
+    setReadabilityChunks({});
+    setShowReadabilityFeatures(true);
+    
+    const features = [
+      "text_simplification",
+      "sentence_analysis", 
+      "vocabulary_highlighting",
+      "reading_pace_guide",
+      "comprehension_aids",
+      "visual_reading_support"
+    ];
+    
     try {
-      const res = await fetch('/api/readability-enhancements', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          bookId: active.id,
-          pageText: active.pages[pageIdx].text,
-          readingLevel: active.readingLevel,
-          childAge: active.child.age,
-          features: ["text_simplification", "sentence_analysis", "vocabulary_highlighting", "reading_pace_guide", "comprehension_aids", "visual_reading_support"]
-        }),
+      // Load features in parallel for speed
+      const promises = features.map(async (feature) => {
+        setReadabilityProgress(prev => ({ ...prev, [feature]: true }));
+        
+        try {
+          const endpoint = feature.replace(/_/g, '-');
+          const res = await fetch(`/api/readability/${endpoint}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              bookId: active.id,
+              pageText: active.pages[pageIdx].text,
+              readingLevel: active.readingLevel,
+              childAge: active.child.age
+            }),
+          });
+          
+          const data = await res.json();
+          if (!res.ok) throw new Error(data?.error || `Failed to load ${feature}`);
+          
+          setReadabilityChunks(prev => ({ ...prev, [feature]: data.data }));
+          setReadabilityProgress(prev => ({ ...prev, [feature]: false }));
+          
+        } catch (error) {
+          console.error(`Error loading ${feature}:`, error);
+          setReadabilityProgress(prev => ({ ...prev, [feature]: false }));
+        }
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Failed to load readability features");
       
-      setReadabilityContent(data.readabilityContent);
-      setShowReadabilityFeatures(true);
-      toast.success("Readability features loaded");
+      await Promise.all(promises);
+      
+      // Don't overwrite the chunks - they're already being displayed progressively
+      // Just set a flag to indicate all features are loaded
+      setReadabilityContent({ loaded: true });
+      toast.success("Readability features loaded!");
+      
     } catch (e: unknown) {
       toast.error("Failed to load readability features", { description: e instanceof Error ? e.message : "Unknown error" });
     } finally {
@@ -1166,20 +1286,6 @@ export default function Home() {
                       )}
                     </Button>
                     
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={loadPresentationFeatures}
-                      disabled={isLoadingPresentation}
-                      className="text-white/70 hover:text-white disabled:opacity-50"
-                      title="Presentation Enhancements"
-                    >
-                      {isLoadingPresentation ? (
-                        <div className="w-4 h-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                      ) : (
-                        "✨"
-                      )}
-                    </Button>
                     
                     <Button
                       variant="ghost"
@@ -1256,7 +1362,7 @@ export default function Home() {
         </div>
         
         {/* Educational Features Panel */}
-        {showEducationalFeatures && educationalContent && (
+        {showEducationalFeatures && (
           <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
             <div className="bg-white rounded-xl max-w-4xl max-h-[80vh] overflow-y-auto p-6">
               <div className="flex items-center justify-between mb-6">
@@ -1270,13 +1376,44 @@ export default function Home() {
                 </Button>
               </div>
               
+              {/* Progress Indicators */}
+              {isLoadingEducational && (
+                <div className="mb-6 p-4 bg-blue-50 rounded-lg">
+                  <h3 className="text-lg font-semibold text-blue-900 mb-3">Loading Features...</h3>
+                  <div className="space-y-2">
+                    {Object.entries(educationalProgress).map(([feature, loading]) => (
+                      <div key={feature} className="flex items-center gap-3">
+                        <div className={`w-4 h-4 rounded-full ${loading ? 'bg-blue-500 animate-pulse' : 'bg-green-500'}`} />
+                        <span className="text-sm text-gray-700 capitalize">
+                          {feature.replace('_', ' ')} {loading ? 'Loading...' : 'Complete!'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Debug Info */}
+              {process.env.NODE_ENV === 'development' && (
+                <div className="mb-4 p-3 bg-gray-100 rounded text-xs">
+                  <strong>Debug:</strong> Chunks: {Object.keys(educationalChunks).length}, 
+                  Content: {educationalContent ? 'Yes' : 'No'}, 
+                  Progress: {Object.keys(educationalProgress).length}
+                </div>
+              )}
+              
               <div className="space-y-6">
                 {/* Comprehension Quiz */}
-                {educationalContent.comprehensionQuiz && (
-                  <div className="bg-blue-50 rounded-lg p-4">
-                    <h3 className="text-lg font-semibold text-blue-900 mb-3">📝 Comprehension Quiz</h3>
+                <div className="bg-blue-50 rounded-lg p-4">
+                  <h3 className="text-lg font-semibold text-blue-900 mb-3">📝 Comprehension Quiz</h3>
+                  {educationalProgress.comprehension_quiz ? (
+                    <div className="flex items-center gap-2 text-blue-700">
+                      <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                      <span>Loading quiz questions...</span>
+                    </div>
+                  ) : educationalChunks.comprehension_quiz ? (
                     <div className="space-y-3">
-                      {educationalContent.comprehensionQuiz.questions?.map((q, idx: number) => (
+                      {educationalChunks.comprehension_quiz?.questions?.map((q: any, idx: number) => (
                         <div key={idx} className="bg-white rounded p-3 border border-gray-200">
                           <p className="font-medium text-gray-900 mb-2">{q.question}</p>
                           <div className="space-y-1">
@@ -1291,15 +1428,22 @@ export default function Home() {
                         </div>
                       ))}
                     </div>
-                  </div>
-                )}
+                  ) : (
+                    <div className="text-gray-500 text-sm">No quiz questions available</div>
+                  )}
+                </div>
                 
                 {/* Vocabulary Builder */}
-                {educationalContent.vocabularyBuilder && (
-                  <div className="bg-green-50 rounded-lg p-4">
-                    <h3 className="text-lg font-semibold text-green-900 mb-3">📚 Vocabulary Builder</h3>
+                <div className="bg-green-50 rounded-lg p-4">
+                  <h3 className="text-lg font-semibold text-green-900 mb-3">📚 Vocabulary Builder</h3>
+                  {educationalProgress.vocabulary_builder ? (
+                    <div className="flex items-center gap-2 text-green-700">
+                      <div className="w-4 h-4 border-2 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+                      <span>Loading vocabulary words...</span>
+                    </div>
+                  ) : educationalChunks.vocabulary_builder ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {educationalContent.vocabularyBuilder.vocabulary?.map((word, idx: number) => (
+                      {educationalChunks.vocabulary_builder?.vocabulary?.map((word: any, idx: number) => (
                         <div key={idx} className="bg-white rounded p-3 border border-gray-200">
                           <h4 className="font-semibold text-green-800">{word.word}</h4>
                           <p className="text-sm text-gray-900 font-medium mb-1">{word.definition}</p>
@@ -1308,15 +1452,22 @@ export default function Home() {
                         </div>
                       ))}
                     </div>
-                  </div>
-                )}
+                  ) : (
+                    <div className="text-gray-500 text-sm">No vocabulary words available</div>
+                  )}
+                </div>
                 
                 {/* Cultural Facts */}
-                {educationalContent.culturalFacts && (
-                  <div className="bg-purple-50 rounded-lg p-4">
-                    <h3 className="text-lg font-semibold text-purple-900 mb-3">🌍 Cultural Facts</h3>
+                <div className="bg-purple-50 rounded-lg p-4">
+                  <h3 className="text-lg font-semibold text-purple-900 mb-3">🌍 Cultural Facts</h3>
+                  {educationalProgress.cultural_facts ? (
+                    <div className="flex items-center gap-2 text-purple-700">
+                      <div className="w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
+                      <span>Loading cultural facts...</span>
+                    </div>
+                  ) : educationalChunks.cultural_facts ? (
                     <div className="space-y-2">
-                      {educationalContent.culturalFacts.culturalFacts?.map((fact, idx: number) => (
+                      {educationalChunks.cultural_facts?.culturalFacts?.map((fact: any, idx: number) => (
                         <div key={idx} className="bg-white rounded p-3 border border-gray-200">
                           <p className="text-gray-900 mb-1 font-medium">{fact.fact}</p>
                           <div className="flex items-center gap-2 text-xs text-gray-800">
@@ -1326,15 +1477,22 @@ export default function Home() {
                         </div>
                       ))}
                     </div>
-                  </div>
-                )}
+                  ) : (
+                    <div className="text-gray-500 text-sm">No cultural facts available</div>
+                  )}
+                </div>
                 
                 {/* Activities */}
-                {educationalContent.activities && (
-                  <div className="bg-orange-50 rounded-lg p-4">
-                    <h3 className="text-lg font-semibold text-orange-900 mb-3">🎨 Activity Suggestions</h3>
+                <div className="bg-orange-50 rounded-lg p-4">
+                  <h3 className="text-lg font-semibold text-orange-900 mb-3">🎨 Activity Suggestions</h3>
+                  {educationalProgress.activity_suggestions ? (
+                    <div className="flex items-center gap-2 text-orange-700">
+                      <div className="w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+                      <span>Loading activity suggestions...</span>
+                    </div>
+                  ) : educationalChunks.activity_suggestions ? (
                     <div className="space-y-3">
-                      {educationalContent.activities.activities?.map((activity, idx: number) => (
+                      {educationalChunks.activity_suggestions?.activities?.map((activity: any, idx: number) => (
                         <div key={idx} className="bg-white rounded p-3">
                           <h4 className="font-semibold text-orange-800 mb-1">{activity.title}</h4>
                           <p className="text-sm text-gray-700 mb-2">{activity.description}</p>
@@ -1345,15 +1503,17 @@ export default function Home() {
                         </div>
                       ))}
                     </div>
-                  </div>
-                )}
+                  ) : (
+                    <div className="text-gray-500 text-sm">No activity suggestions available</div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
         )}
         
         {/* Accessibility Features Panel */}
-        {showAccessibilityFeatures && accessibilityContent && (
+        {showAccessibilityFeatures && (
           <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
             <div className="bg-white rounded-xl max-w-4xl max-h-[80vh] overflow-y-auto p-6">
               <div className="flex items-center justify-between mb-6">
@@ -1367,24 +1527,46 @@ export default function Home() {
                 </Button>
               </div>
               
+              {/* Progress Indicators */}
+              {isLoadingAccessibility && (
+                <div className="mb-6 p-4 bg-green-50 rounded-lg">
+                  <h3 className="text-lg font-semibold text-green-900 mb-3">Loading Features...</h3>
+                  <div className="space-y-2">
+                    {Object.entries(accessibilityProgress).map(([feature, loading]) => (
+                      <div key={feature} className="flex items-center gap-3">
+                        <div className={`w-4 h-4 rounded-full ${loading ? 'bg-green-500 animate-pulse' : 'bg-green-600'}`} />
+                        <span className="text-sm text-gray-700 capitalize">
+                          {feature.replace('_', ' ')} {loading ? 'Loading...' : 'Complete!'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
               <div className="space-y-6">
                 {/* Alt Text */}
-                {accessibilityContent.altText && (
-                  <div className="bg-blue-50 rounded-lg p-4">
-                    <h3 className="text-lg font-semibold text-blue-900 mb-3">🖼️ Image Description</h3>
+                <div className="bg-blue-50 rounded-lg p-4">
+                  <h3 className="text-lg font-semibold text-blue-900 mb-3">🖼️ Image Description</h3>
+                  {accessibilityProgress.alt_text_generation ? (
+                    <div className="flex items-center gap-2 text-blue-700">
+                      <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                      <span>Loading image description...</span>
+                    </div>
+                  ) : accessibilityChunks.alt_text_generation ? (
                     <div className="space-y-3">
                       <div className="bg-white rounded p-3">
                         <h4 className="font-medium text-gray-900 mb-2">Detailed Description</h4>
-                        <p className="text-sm text-gray-700">{accessibilityContent.altText.altText}</p>
+                        <p className="text-sm text-gray-700">{accessibilityChunks.alt_text_generation?.altText}</p>
                       </div>
                       <div className="bg-white rounded p-3">
                         <h4 className="font-medium text-gray-900 mb-2">Simple Version</h4>
-                        <p className="text-sm text-gray-700">{accessibilityContent.altText.simpleAltText}</p>
+                        <p className="text-sm text-gray-700">{accessibilityChunks.alt_text_generation?.simpleAltText}</p>
                       </div>
                       <div className="bg-white rounded p-3">
                         <h4 className="font-medium text-gray-900 mb-2">Key Elements</h4>
                         <div className="flex flex-wrap gap-2">
-                          {accessibilityContent.altText.keyElements?.map((element: string, idx: number) => (
+                          {accessibilityChunks.alt_text_generation?.keyElements?.map((element: string, idx: number) => (
                             <span key={idx} className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">
                               {element}
                             </span>
@@ -1392,139 +1574,170 @@ export default function Home() {
                         </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  ) : (
+                    <div className="text-gray-500 text-sm">No image description available</div>
+                  )}
+                </div>
                 
                 {/* Simplified Text */}
-                {accessibilityContent.simplifiedText && (
-                  <div className="bg-green-50 rounded-lg p-4">
-                    <h3 className="text-lg font-semibold text-green-900 mb-3">📖 Reading Levels</h3>
+                <div className="bg-green-50 rounded-lg p-4">
+                  <h3 className="text-lg font-semibold text-green-900 mb-3">📖 Reading Levels</h3>
+                  {accessibilityProgress.simplified_text ? (
+                    <div className="flex items-center gap-2 text-green-700">
+                      <div className="w-4 h-4 border-2 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+                      <span>Loading reading levels...</span>
+                    </div>
+                  ) : accessibilityChunks.simplified_text ? (
                     <div className="space-y-3">
                       <div className="bg-white rounded p-3">
                         <h4 className="font-medium text-green-800 mb-2">Early Reader (3-5 years)</h4>
-                        <p className="text-sm text-gray-700">{accessibilityContent.simplifiedText.earlyReader}</p>
+                        <p className="text-sm text-gray-700">{accessibilityChunks.simplified_text?.earlyReader}</p>
                       </div>
                       <div className="bg-white rounded p-3">
                         <h4 className="font-medium text-green-800 mb-2">Middle Reader (6-8 years)</h4>
-                        <p className="text-sm text-gray-700">{accessibilityContent.simplifiedText.middleReader}</p>
+                        <p className="text-sm text-gray-700">{accessibilityChunks.simplified_text?.middleReader}</p>
                       </div>
                       <div className="bg-white rounded p-3">
                         <h4 className="font-medium text-green-800 mb-2">Advanced Reader (9-12 years)</h4>
-                        <p className="text-sm text-gray-700">{accessibilityContent.simplifiedText.advancedReader}</p>
+                        <p className="text-sm text-gray-700">{accessibilityChunks.simplified_text?.advancedReader}</p>
                       </div>
                     </div>
-                  </div>
-                )}
+                  ) : (
+                    <div className="text-gray-500 text-sm">No reading levels available</div>
+                  )}
+                </div>
                 
                 {/* Dyslexia Support */}
-                {accessibilityContent.dyslexiaFriendly && (
-                  <div className="bg-purple-50 rounded-lg p-4">
-                    <h3 className="text-lg font-semibold text-purple-900 mb-3">🔤 Dyslexia-Friendly Formatting</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-purple-50 rounded-lg p-4">
+                  <h3 className="text-lg font-semibold text-purple-900 mb-3">🔤 Dyslexia-Friendly Formatting</h3>
+                  {accessibilityProgress.dyslexia_friendly ? (
+                    <div className="flex items-center gap-2 text-purple-700">
+                      <div className="w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
+                      <span>Loading dyslexia-friendly formatting...</span>
+                    </div>
+                  ) : accessibilityChunks.dyslexia_friendly ? (
+                    <div className="space-y-4">
+                      {/* Font & Formatting */}
                       <div className="bg-white rounded p-3">
-                        <h4 className="font-medium text-purple-800 mb-2">Font & Formatting</h4>
-                        <ul className="text-sm text-gray-700 space-y-1">
-                          <li>• Font: {accessibilityContent.dyslexiaFriendly.formatting?.font}</li>
-                          <li>• Size: {accessibilityContent.dyslexiaFriendly.formatting?.size}</li>
-                          <li>• Line Height: {accessibilityContent.dyslexiaFriendly.formatting?.lineHeight}</li>
-                          <li>• Letter Spacing: {accessibilityContent.dyslexiaFriendly.formatting?.letterSpacing}</li>
-                        </ul>
-                      </div>
-                      <div className="bg-white rounded p-3">
-                        <h4 className="font-medium text-purple-800 mb-2">Color Coding</h4>
-                        <div className="space-y-1">
-                          {accessibilityContent.dyslexiaFriendly.colorCoding && Object.entries(accessibilityContent.dyslexiaFriendly.colorCoding).map(([key, value]) => (
-                            <div key={key} className="flex items-center gap-2 text-sm">
-                              <div className="w-4 h-4 rounded" style={{ backgroundColor: value as string }}></div>
-                              <span className="capitalize">{key}</span>
-                            </div>
-                          ))}
+                        <h4 className="font-medium text-purple-800 mb-3">Font & Formatting</h4>
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <span className="font-medium text-gray-700">Font:</span>
+                            <span className="ml-2 text-gray-900">{accessibilityChunks.dyslexia_friendly?.formatting?.font || 'Not specified'}</span>
+                          </div>
+                          <div>
+                            <span className="font-medium text-gray-700">Size:</span>
+                            <span className="ml-2 text-gray-900">{accessibilityChunks.dyslexia_friendly?.formatting?.size || 'Not specified'}</span>
+                          </div>
+                          <div>
+                            <span className="font-medium text-gray-700">Line Height:</span>
+                            <span className="ml-2 text-gray-900">{accessibilityChunks.dyslexia_friendly?.formatting?.lineHeight || 'Not specified'}</span>
+                          </div>
+                          <div>
+                            <span className="font-medium text-gray-700">Letter Spacing:</span>
+                            <span className="ml-2 text-gray-900">{accessibilityChunks.dyslexia_friendly?.formatting?.letterSpacing || 'Not specified'}</span>
+                          </div>
                         </div>
                       </div>
+
+                      {/* Color Coding */}
+                      <div className="bg-white rounded p-3">
+                        <h4 className="font-medium text-purple-800 mb-3">Color Coding</h4>
+                        <div className="space-y-3">
+                          {accessibilityChunks.dyslexia_friendly?.colorCoding && Object.keys(accessibilityChunks.dyslexia_friendly.colorCoding).length > 0 ? (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              {Object.entries(accessibilityChunks.dyslexia_friendly.colorCoding).map(([key, value]) => (
+                                <div key={key} className="flex items-center gap-3 p-2 bg-gray-50 rounded">
+                                  <div 
+                                    className="w-10 h-10 rounded border-2 border-gray-300 shadow-sm flex-shrink-0" 
+                                    style={{ backgroundColor: value as string }}
+                                    title={`${key}: ${value}`}
+                                  ></div>
+                                  <div className="flex flex-col min-w-0">
+                                    <span className="font-medium capitalize text-gray-900 truncate">{key}</span>
+                                    <span className="text-xs text-gray-600 font-mono">{value as string}</span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-gray-500 text-sm italic">No color coding recommendations available</div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Visual Cues */}
+                      {accessibilityChunks.dyslexia_friendly?.visualCues && accessibilityChunks.dyslexia_friendly.visualCues.length > 0 && (
+                        <div className="bg-white rounded p-3">
+                          <h4 className="font-medium text-purple-800 mb-3">Visual Cues</h4>
+                          <ul className="space-y-1 text-sm text-gray-700">
+                            {accessibilityChunks.dyslexia_friendly.visualCues.map((cue: string, idx: number) => (
+                              <li key={idx} className="flex items-start gap-2">
+                                <span className="text-purple-600 mt-1">•</span>
+                                <span>{cue}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Accessibility Features */}
+                      {accessibilityChunks.dyslexia_friendly?.accessibility && (
+                        <div className="bg-white rounded p-3">
+                          <h4 className="font-medium text-purple-800 mb-3">Accessibility Features</h4>
+                          <div className="flex flex-wrap gap-2">
+                            {Object.entries(accessibilityChunks.dyslexia_friendly.accessibility).map(([key, value]) => (
+                              <span 
+                                key={key} 
+                                className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                  value ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
+                                }`}
+                              >
+                                {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}: {value ? 'Yes' : 'No'}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Color-Coded Text Display */}
+                      {accessibilityChunks.dyslexia_friendly?.colorCoding && active && active.pages[pageIdx] && (
+                        <div className="bg-white rounded p-3">
+                          <h4 className="font-medium text-purple-800 mb-3">Color-Coded Text Preview</h4>
+                          <div 
+                            className="p-4 border rounded-lg"
+                            style={{
+                              fontFamily: accessibilityChunks.dyslexia_friendly?.formatting?.font || 'Arial, sans-serif',
+                              fontSize: accessibilityChunks.dyslexia_friendly?.formatting?.size || '16px',
+                              lineHeight: accessibilityChunks.dyslexia_friendly?.formatting?.lineHeight || '1.5',
+                              letterSpacing: accessibilityChunks.dyslexia_friendly?.formatting?.letterSpacing || '0.1em',
+                              backgroundColor: '#f8f9fa',
+                              color: '#212529'
+                            }}
+                          >
+                            {renderColorCodedText(
+                              active.pages[pageIdx].text, 
+                              accessibilityChunks.dyslexia_friendly.colorCoding
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-600 mt-2 italic">
+                            This is how the current page text would look with dyslexia-friendly color coding applied.
+                          </p>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                )}
+                  ) : (
+                    <div className="text-gray-500 text-sm">No dyslexia-friendly formatting available</div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
         )}
         
-        {/* Presentation Features Panel */}
-        {showPresentationFeatures && presentationContent && (
-          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-xl max-w-4xl max-h-[80vh] overflow-y-auto p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">Presentation Enhancements</h2>
-                <Button
-                  variant="ghost"
-                  onClick={() => setShowPresentationFeatures(false)}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  <X className="w-5 h-5" />
-                </Button>
-              </div>
-              
-              <div className="space-y-6">
-                {/* Animations */}
-                {presentationContent.animations && (
-                  <div className="bg-orange-50 rounded-lg p-4">
-                    <h3 className="text-lg font-semibold text-orange-900 mb-3">🎬 Animation Effects</h3>
-                    <div className="space-y-3">
-                      {presentationContent.animations.animations?.map((animation, idx: number) => (
-                        <div key={idx} className="bg-white rounded p-3">
-                          <h4 className="font-medium text-orange-800 mb-1">{animation.element} - {animation.type}</h4>
-                          <p className="text-sm text-gray-700 mb-2">{animation.description}</p>
-                          <div className="flex items-center gap-4 text-xs text-gray-600">
-                            <span>Duration: {animation.duration}</span>
-                            <span>Trigger: {animation.trigger}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                
-                {/* Interactive Elements */}
-                {presentationContent.interactiveElements && (
-                  <div className="bg-pink-50 rounded-lg p-4">
-                    <h3 className="text-lg font-semibold text-pink-900 mb-3">🎮 Interactive Elements</h3>
-                    <div className="space-y-3">
-                      {presentationContent.interactiveElements.clickableElements?.map((element, idx: number) => (
-                        <div key={idx} className="bg-white rounded p-3">
-                          <h4 className="font-medium text-pink-800 mb-1">Clickable: {element.element}</h4>
-                          <p className="text-sm text-gray-700 mb-2">Action: {element.action} - {element.feedback}</p>
-                          <p className="text-xs text-gray-600">Sound: {element.sound}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                
-                {/* Sound Effects */}
-                {presentationContent.soundEffects && (
-                  <div className="bg-indigo-50 rounded-lg p-4">
-                    <h3 className="text-lg font-semibold text-indigo-900 mb-3">🔊 Sound Effects</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {presentationContent.soundEffects.ambientSounds?.map((sound, idx: number) => (
-                        <div key={idx} className="bg-white rounded p-3">
-                          <h4 className="font-medium text-indigo-800 mb-1">{sound.sound}</h4>
-                          <p className="text-sm text-gray-700 mb-2">{sound.description}</p>
-                          <div className="flex items-center gap-2 text-xs text-gray-600">
-                            <span>Volume: {sound.volume}</span>
-                            <span>Loop: {sound.loop ? 'Yes' : 'No'}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
         
         {/* Readability Features Panel */}
-        {showReadabilityFeatures && readabilityContent && (
+        {showReadabilityFeatures && (
           <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
             <div className="bg-white rounded-xl max-w-5xl max-h-[80vh] overflow-y-auto p-6">
               <div className="flex items-center justify-between mb-6">
@@ -1538,80 +1751,108 @@ export default function Home() {
                 </Button>
               </div>
               
+              {/* Debug Info */}
+              {process.env.NODE_ENV === 'development' && (
+                <div className="mb-4 p-3 bg-gray-100 rounded text-xs">
+                  <strong>Debug:</strong> Chunks: {Object.keys(readabilityChunks).length}, 
+                  Content: {readabilityContent ? 'Yes' : 'No'}, 
+                  Progress: {Object.keys(readabilityProgress).length}
+                </div>
+              )}
+              
               <div className="space-y-6">
                 {/* Text Simplification */}
-                {readabilityContent.textSimplification && (
-                  <div className="bg-blue-50 rounded-lg p-4">
-                    <h3 className="text-lg font-semibold text-blue-900 mb-3">📝 Text Simplification</h3>
+                <div className="bg-blue-50 rounded-lg p-4">
+                  <h3 className="text-lg font-semibold text-blue-900 mb-3">📝 Text Simplification</h3>
+                  {readabilityProgress.text_simplification ? (
+                    <div className="flex items-center gap-2 text-blue-700">
+                      <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                      <span>Loading text simplification...</span>
+                    </div>
+                  ) : readabilityChunks.text_simplification ? (
                     <div className="space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="bg-white rounded p-3 border border-gray-200">
                           <h4 className="font-medium text-blue-800 mb-2">Very Simple</h4>
-                          <p className="text-sm text-gray-900 font-medium">{readabilityContent.textSimplification.simplifiedVersions?.verySimple}</p>
+                          <p className="text-sm text-gray-900 font-medium">{readabilityChunks.text_simplification?.simplifiedVersions?.verySimple}</p>
                         </div>
                         <div className="bg-white rounded p-3 border border-gray-200">
                           <h4 className="font-medium text-blue-800 mb-2">Simple</h4>
-                          <p className="text-sm text-gray-900 font-medium">{readabilityContent.textSimplification.simplifiedVersions?.simple}</p>
+                          <p className="text-sm text-gray-900 font-medium">{readabilityChunks.text_simplification?.simplifiedVersions?.simple}</p>
                         </div>
                         <div className="bg-white rounded p-3 border border-gray-200">
                           <h4 className="font-medium text-blue-800 mb-2">Enhanced</h4>
-                          <p className="text-sm text-gray-900 font-medium">{readabilityContent.textSimplification.simplifiedVersions?.enhanced}</p>
+                          <p className="text-sm text-gray-900 font-medium">{readabilityChunks.text_simplification?.simplifiedVersions?.enhanced}</p>
                         </div>
                         <div className="bg-white rounded p-3 border border-gray-200">
                           <h4 className="font-medium text-blue-800 mb-2">Original</h4>
-                          <p className="text-sm text-gray-900 font-medium">{readabilityContent.textSimplification.simplifiedVersions?.original}</p>
+                          <p className="text-sm text-gray-900 font-medium">{readabilityChunks.text_simplification?.simplifiedVersions?.original}</p>
                         </div>
                       </div>
                       <div className="bg-white rounded p-3 border border-gray-200">
                         <h4 className="font-medium text-blue-800 mb-2">Readability Scores</h4>
                         <div className="flex items-center gap-4 text-sm text-gray-900 font-medium">
-                          <span>Grade Level: {readabilityContent.textSimplification.readabilityScores?.gradeLevel}</span>
-                          <span>Difficulty: {readabilityContent.textSimplification.readabilityScores?.difficulty}</span>
-                          <span>Flesch-Kincaid: {readabilityContent.textSimplification.readabilityScores?.fleschKincaid}</span>
+                          <span>Grade Level: {readabilityChunks.text_simplification?.readabilityScores?.gradeLevel}</span>
+                          <span>Difficulty: {readabilityChunks.text_simplification?.readabilityScores?.difficulty}</span>
+                          <span>Flesch-Kincaid: {readabilityChunks.text_simplification?.readabilityScores?.fleschKincaid}</span>
                         </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  ) : (
+                    <div className="text-gray-500 text-sm">No text simplification available</div>
+                  )}
+                </div>
                 
                 {/* Sentence Analysis */}
-                {readabilityContent.sentenceAnalysis && (
-                  <div className="bg-green-50 rounded-lg p-4">
-                    <h3 className="text-lg font-semibold text-green-900 mb-3">📊 Sentence Analysis</h3>
+                <div className="bg-green-50 rounded-lg p-4">
+                  <h3 className="text-lg font-semibold text-green-900 mb-3">📊 Sentence Analysis</h3>
+                  {readabilityProgress.sentence_analysis ? (
+                    <div className="flex items-center gap-2 text-green-700">
+                      <div className="w-4 h-4 border-2 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+                      <span>Loading sentence analysis...</span>
+                    </div>
+                  ) : readabilityChunks.sentence_analysis ? (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="bg-white rounded p-3 border border-gray-200">
                         <h4 className="font-medium text-green-800 mb-2">Sentence Stats</h4>
                         <ul className="text-sm text-gray-900 font-medium space-y-1">
-                          <li>Total: {readabilityContent.sentenceAnalysis.sentenceAnalysis?.totalSentences}</li>
-                          <li>Avg Length: {readabilityContent.sentenceAnalysis.sentenceAnalysis?.averageLength} words</li>
-                          <li>Longest: {readabilityContent.sentenceAnalysis.sentenceAnalysis?.longestSentence} words</li>
-                          <li>Shortest: {readabilityContent.sentenceAnalysis.sentenceAnalysis?.shortestSentence} words</li>
+                          <li>Total: {readabilityChunks.sentence_analysis?.sentenceAnalysis?.totalSentences}</li>
+                          <li>Avg Length: {readabilityChunks.sentence_analysis?.sentenceAnalysis?.averageLength} words</li>
+                          <li>Longest: {readabilityChunks.sentence_analysis?.sentenceAnalysis?.longestSentence} words</li>
+                          <li>Shortest: {readabilityChunks.sentence_analysis?.sentenceAnalysis?.shortestSentence} words</li>
                         </ul>
                       </div>
                       <div className="bg-white rounded p-3 border border-gray-200">
                         <h4 className="font-medium text-green-800 mb-2">Word Analysis</h4>
                         <ul className="text-sm text-gray-900 font-medium space-y-1">
-                          <li>Total Words: {readabilityContent.sentenceAnalysis.wordAnalysis?.totalWords}</li>
-                          <li>Complex Words: {readabilityContent.sentenceAnalysis.wordAnalysis?.complexWords?.join(", ")}</li>
+                          <li>Total Words: {readabilityChunks.sentence_analysis?.wordAnalysis?.totalWords}</li>
+                          <li>Complex Words: {readabilityChunks.sentence_analysis?.wordAnalysis?.complexWords?.join(", ")}</li>
                         </ul>
                       </div>
                       <div className="bg-white rounded p-3 border border-gray-200">
                         <h4 className="font-medium text-green-800 mb-2">Flow Analysis</h4>
                         <ul className="text-sm text-gray-900 font-medium space-y-1">
-                          <li>Smooth Transitions: {readabilityContent.sentenceAnalysis.flowAnalysis?.smoothTransitions}</li>
-                          <li>Awkward Phrases: {readabilityContent.sentenceAnalysis.flowAnalysis?.awkwardPhrases}</li>
+                          <li>Smooth Transitions: {readabilityChunks.sentence_analysis?.flowAnalysis?.smoothTransitions}</li>
+                          <li>Awkward Phrases: {readabilityChunks.sentence_analysis?.flowAnalysis?.awkwardPhrases}</li>
                         </ul>
                       </div>
                     </div>
-                  </div>
-                )}
+                  ) : (
+                    <div className="text-gray-500 text-sm">No sentence analysis available</div>
+                  )}
+                </div>
                 
                 {/* Vocabulary Highlighting */}
-                {readabilityContent.vocabularyHighlighting && (
-                  <div className="bg-purple-50 rounded-lg p-4">
-                    <h3 className="text-lg font-semibold text-purple-900 mb-3">🔤 Vocabulary Support</h3>
+                <div className="bg-purple-50 rounded-lg p-4">
+                  <h3 className="text-lg font-semibold text-purple-900 mb-3">🔤 Vocabulary Support</h3>
+                  {readabilityProgress.vocabulary_highlighting ? (
+                    <div className="flex items-center gap-2 text-purple-700">
+                      <div className="w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
+                      <span>Loading vocabulary support...</span>
+                    </div>
+                  ) : readabilityChunks.vocabulary_highlighting ? (
                     <div className="space-y-3">
-                      {readabilityContent.vocabularyHighlighting.challengingWords?.map((word, idx: number) => (
+                      {readabilityChunks.vocabulary_highlighting?.challengingWords?.map((word: any, idx: number) => (
                         <div key={idx} className="bg-white rounded p-3 border border-gray-200">
                           <div className="flex items-center justify-between mb-2">
                             <h4 className="font-semibold text-purple-800">{word.word}</h4>
@@ -1625,26 +1866,33 @@ export default function Home() {
                         </div>
                       ))}
                     </div>
-                  </div>
-                )}
+                  ) : (
+                    <div className="text-gray-500 text-sm">No vocabulary support available</div>
+                  )}
+                </div>
                 
                 {/* Reading Pace Guide */}
-                {readabilityContent.readingPaceGuide && (
-                  <div className="bg-orange-50 rounded-lg p-4">
-                    <h3 className="text-lg font-semibold text-orange-900 mb-3">⏱️ Reading Pace Guide</h3>
+                <div className="bg-orange-50 rounded-lg p-4">
+                  <h3 className="text-lg font-semibold text-orange-900 mb-3">⏱️ Reading Pace Guide</h3>
+                  {readabilityProgress.reading_pace_guide ? (
+                    <div className="flex items-center gap-2 text-orange-700">
+                      <div className="w-4 h-4 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+                      <span>Loading reading pace guide...</span>
+                    </div>
+                  ) : readabilityChunks.reading_pace_guide ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="bg-white rounded p-3 border border-gray-200">
                         <h4 className="font-medium text-orange-800 mb-2">Pace Recommendations</h4>
                         <ul className="text-sm text-gray-900 font-medium space-y-1">
-                          <li>Speed: {readabilityContent.readingPaceGuide.paceGuide?.recommendedSpeed}</li>
-                          <li>WPM: {readabilityContent.readingPaceGuide.paceGuide?.wordsPerMinute}</li>
-                          <li>Time: {readabilityContent.readingPaceGuide.paceGuide?.totalReadingTime}</li>
+                          <li>Speed: {readabilityChunks.reading_pace_guide?.paceGuide?.recommendedSpeed}</li>
+                          <li>WPM: {readabilityChunks.reading_pace_guide?.paceGuide?.wordsPerMinute}</li>
+                          <li>Time: {readabilityChunks.reading_pace_guide?.paceGuide?.totalReadingTime}</li>
                         </ul>
                       </div>
                       <div className="bg-white rounded p-3 border border-gray-200">
                         <h4 className="font-medium text-orange-800 mb-2">Pause Points</h4>
                         <div className="space-y-2">
-                          {readabilityContent.readingPaceGuide.paceGuide?.pausePoints?.map((pause, idx: number) => (
+                          {readabilityChunks.reading_pace_guide?.paceGuide?.pausePoints?.map((pause: any, idx: number) => (
                             <div key={idx} className="text-xs text-gray-900 font-medium">
                               <strong>{pause.location}:</strong> {pause.reason} ({pause.duration})
                             </div>
@@ -1652,18 +1900,25 @@ export default function Home() {
                         </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  ) : (
+                    <div className="text-gray-500 text-sm">No reading pace guide available</div>
+                  )}
+                </div>
                 
                 {/* Comprehension Aids */}
-                {readabilityContent.comprehensionAids && (
-                  <div className="bg-pink-50 rounded-lg p-4">
-                    <h3 className="text-lg font-semibold text-pink-900 mb-3">🧠 Comprehension Aids</h3>
+                <div className="bg-pink-50 rounded-lg p-4">
+                  <h3 className="text-lg font-semibold text-pink-900 mb-3">🧠 Comprehension Aids</h3>
+                  {readabilityProgress.comprehension_aids ? (
+                    <div className="flex items-center gap-2 text-pink-700">
+                      <div className="w-4 h-4 border-2 border-pink-500 border-t-transparent rounded-full animate-spin"></div>
+                      <span>Loading comprehension aids...</span>
+                    </div>
+                  ) : readabilityChunks.comprehension_aids ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="bg-white rounded p-3 border border-gray-200">
                         <h4 className="font-medium text-pink-800 mb-2">Question Prompts</h4>
                         <div className="space-y-2">
-                          {readabilityContent.comprehensionAids.questionPrompts?.map((prompt, idx: number) => (
+                          {readabilityChunks.comprehension_aids?.questionPrompts?.map((prompt: any, idx: number) => (
                             <div key={idx} className="text-sm">
                               <strong className="text-pink-700">{prompt.type}:</strong>
                               <ul className="ml-4 mt-1 space-y-1">
@@ -1678,45 +1933,95 @@ export default function Home() {
                       <div className="bg-white rounded p-3 border border-gray-200">
                         <h4 className="font-medium text-pink-800 mb-2">Summary Guide</h4>
                         <ul className="text-sm text-gray-900 font-medium space-y-1">
-                          <li><strong>Character:</strong> {readabilityContent.comprehensionAids.summaryGuide?.mainCharacter}</li>
-                          <li><strong>Setting:</strong> {readabilityContent.comprehensionAids.summaryGuide?.setting}</li>
-                          <li><strong>Problem:</strong> {readabilityContent.comprehensionAids.summaryGuide?.problem}</li>
-                          <li><strong>Solution:</strong> {readabilityContent.comprehensionAids.summaryGuide?.solution}</li>
-                          <li><strong>Lesson:</strong> {readabilityContent.comprehensionAids.summaryGuide?.lesson}</li>
+                          <li><strong>Character:</strong> {readabilityChunks.comprehension_aids?.summaryGuide?.mainCharacter}</li>
+                          <li><strong>Setting:</strong> {readabilityChunks.comprehension_aids?.summaryGuide?.setting}</li>
+                          <li><strong>Problem:</strong> {readabilityChunks.comprehension_aids?.summaryGuide?.problem}</li>
+                          <li><strong>Solution:</strong> {readabilityChunks.comprehension_aids?.summaryGuide?.solution}</li>
+                          <li><strong>Lesson:</strong> {readabilityChunks.comprehension_aids?.summaryGuide?.lesson}</li>
                         </ul>
                       </div>
                     </div>
-                  </div>
-                )}
+                  ) : (
+                    <div className="text-gray-500 text-sm">No comprehension aids available</div>
+                  )}
+                </div>
                 
                 {/* Visual Reading Support */}
-                {readabilityContent.visualReadingSupport && (
-                  <div className="bg-indigo-50 rounded-lg p-4">
-                    <h3 className="text-lg font-semibold text-indigo-900 mb-3">👁️ Visual Reading Support</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="bg-white rounded p-3 border border-gray-200">
-                        <h4 className="font-medium text-indigo-800 mb-2">Text Formatting</h4>
-                        <ul className="text-sm text-gray-900 font-medium space-y-1">
-                          <li>Font: {readabilityContent.visualReadingSupport.textFormatting?.fontFamily}</li>
-                          <li>Size: {readabilityContent.visualReadingSupport.textFormatting?.fontSize}</li>
-                          <li>Line Height: {readabilityContent.visualReadingSupport.textFormatting?.lineHeight}</li>
-                          <li>Letter Spacing: {readabilityContent.visualReadingSupport.textFormatting?.letterSpacing}</li>
-                        </ul>
-                      </div>
-                      <div className="bg-white rounded p-3 border border-gray-200">
-                        <h4 className="font-medium text-indigo-800 mb-2">Color Coding</h4>
-                        <div className="space-y-1">
-                          {readabilityContent.visualReadingSupport.colorCoding && Object.entries(readabilityContent.visualReadingSupport.colorCoding).map(([key, value]) => (
-                            <div key={key} className="flex items-center gap-2 text-sm text-gray-900 font-medium">
-                              <div className="w-4 h-4 rounded border border-gray-300" style={{ backgroundColor: value as string }}></div>
-                              <span className="capitalize">{key}</span>
-                            </div>
-                          ))}
+                <div className="bg-indigo-50 rounded-lg p-4">
+                  <h3 className="text-lg font-semibold text-indigo-900 mb-3">👁️ Visual Reading Support</h3>
+                  {readabilityProgress.visual_reading_support ? (
+                    <div className="flex items-center gap-2 text-indigo-700">
+                      <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                      <span>Loading visual reading support...</span>
+                    </div>
+                  ) : readabilityChunks.visual_reading_support ? (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="bg-white rounded p-3 border border-gray-200">
+                          <h4 className="font-medium text-indigo-800 mb-2">Text Formatting</h4>
+                          <ul className="text-sm text-gray-900 font-medium space-y-1">
+                            <li>Font: {readabilityChunks.visual_reading_support?.textFormatting?.fontFamily}</li>
+                            <li>Size: {readabilityChunks.visual_reading_support?.textFormatting?.fontSize}</li>
+                            <li>Line Height: {readabilityChunks.visual_reading_support?.textFormatting?.lineHeight}</li>
+                            <li>Letter Spacing: {readabilityChunks.visual_reading_support?.textFormatting?.letterSpacing}</li>
+                          </ul>
+                        </div>
+                        <div className="bg-white rounded p-3 border border-gray-200">
+                          <h4 className="font-medium text-indigo-800 mb-2">Color Coding</h4>
+                          <div className="space-y-2">
+                            {readabilityChunks.visual_reading_support?.colorCoding && Object.keys(readabilityChunks.visual_reading_support.colorCoding).length > 0 ? (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {Object.entries(readabilityChunks.visual_reading_support.colorCoding).map(([key, value]) => (
+                                  <div key={key} className="flex items-center gap-2 p-2 bg-gray-50 rounded">
+                                    <div 
+                                      className="w-6 h-6 rounded border-2 border-gray-300 shadow-sm flex-shrink-0" 
+                                      style={{ backgroundColor: value as string }}
+                                      title={`${key}: ${value}`}
+                                    ></div>
+                                    <div className="flex flex-col min-w-0">
+                                      <span className="font-medium capitalize text-gray-900 text-sm">{key}</span>
+                                      <span className="text-xs text-gray-600 font-mono">{value as string}</span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="text-gray-500 text-sm italic">No color coding recommendations available</div>
+                            )}
+                          </div>
                         </div>
                       </div>
+
+                      {/* Color-Coded Text Preview */}
+                      {readabilityChunks.visual_reading_support?.colorCoding && active && active.pages[pageIdx] && (
+                        <div className="bg-white rounded p-3 border border-gray-200">
+                          <h4 className="font-medium text-indigo-800 mb-3">Color-Coded Text Preview</h4>
+                          <div 
+                            className="p-4 border rounded-lg"
+                            style={{
+                              fontFamily: readabilityChunks.visual_reading_support?.textFormatting?.fontFamily || 'Arial, sans-serif',
+                              fontSize: readabilityChunks.visual_reading_support?.textFormatting?.fontSize || '16px',
+                              lineHeight: readabilityChunks.visual_reading_support?.textFormatting?.lineHeight || '1.5',
+                              letterSpacing: readabilityChunks.visual_reading_support?.textFormatting?.letterSpacing || '0.1em',
+                              backgroundColor: '#f8f9fa',
+                              color: '#212529'
+                            }}
+                          >
+                            {renderColorCodedText(
+                              active.pages[pageIdx].text, 
+                              readabilityChunks.visual_reading_support.colorCoding
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-600 mt-2 italic">
+                            This is how the current page text would look with visual reading support color coding applied.
+                          </p>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                )}
+                  ) : (
+                    <div className="text-gray-500 text-sm">No visual reading support available</div>
+                  )}
+                </div>
               </div>
             </div>
           </div>

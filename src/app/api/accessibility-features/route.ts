@@ -228,7 +228,7 @@ export async function POST(req: NextRequest) {
         "colorCoding": {
           "nouns": "#FF6B6B",
           "verbs": "#4ECDC4", 
-          "adjectives": "#45B7D1",
+          "adjectives": "#9B59B6",
           "important": "#FFA07A"
         },
         "chunking": ["First sentence", "Second sentence", "Third sentence"],
@@ -258,7 +258,7 @@ export async function POST(req: NextRequest) {
           colorCoding: {
             nouns: "#FF6B6B",
             verbs: "#4ECDC4",
-            adjectives: "#45B7D1",
+            adjectives: "#9B59B6",
             important: "#FFA07A"
           },
           chunking: ["First sentence", "Second sentence"],
